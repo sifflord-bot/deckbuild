@@ -285,6 +285,9 @@ class GameState(
         if (filter.excludeSelf && source != null && permanent === source) return false
         if (filter.types.isNotEmpty() && permanent.def.type !in filter.types) return false
         if (filter.aspects.isNotEmpty() && permanent.def.aspect !in filter.aspects) return false
+        // Stammeszugehoerigkeit: ein Treffer genuegt, damit Kreaturen mehreren
+        // Staemmen angehoeren und von mehreren Anfuehrern profitieren koennen.
+        if (filter.subtypes.isNotEmpty() && filter.subtypes.none { it in permanent.def.subtypes }) return false
 
         val effectiveKeywords = permanent.def.keywords + permanent.grantedKeywords + permanent.tempKeywords
         if (filter.keywords.isNotEmpty() && !effectiveKeywords.containsAll(filter.keywords)) return false

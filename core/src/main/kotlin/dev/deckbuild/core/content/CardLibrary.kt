@@ -15,6 +15,7 @@ import dev.deckbuild.core.model.Keyword
 import dev.deckbuild.core.model.Rarity
 import dev.deckbuild.core.model.Selector
 import dev.deckbuild.core.model.StaticAbility
+import dev.deckbuild.core.model.Subtype
 import dev.deckbuild.core.model.TargetKind
 import dev.deckbuild.core.model.TargetSpec
 import dev.deckbuild.core.model.Trigger
@@ -84,6 +85,7 @@ object CardLibrary : CardResolver {
             aspect = Aspect.LICHT,
             power = 1,
             toughness = 1,
+            subtypes = setOf(Subtype.GEIST),
             isToken = true,
             rulesText = "Spielstein.",
         ),
@@ -94,6 +96,7 @@ object CardLibrary : CardResolver {
             aspect = Aspect.ASCHE,
             power = 1,
             toughness = 1,
+            subtypes = setOf(Subtype.UNTOTER),
             isToken = true,
             rulesText = "Spielstein.",
         ),
@@ -104,6 +107,7 @@ object CardLibrary : CardResolver {
             aspect = Aspect.HAIN,
             power = 2,
             toughness = 2,
+            subtypes = setOf(Subtype.BESTIE),
             isToken = true,
             rulesText = "Spielstein.",
         ),
@@ -114,6 +118,7 @@ object CardLibrary : CardResolver {
             aspect = Aspect.GLUT,
             power = 1,
             toughness = 1,
+            subtypes = setOf(Subtype.ELEMENTAR),
             keywords = setOf(Keyword.FLINK),
             isToken = true,
             rulesText = "Spielstein.",
@@ -131,6 +136,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.GLUT, 1),
             power = 2,
             toughness = 1,
+            subtypes = setOf(Subtype.ELEMENTAR),
             keywords = setOf(Keyword.FLINK),
             rulesText = "Flink.",
             flavor = "Er brennt schneller, als er denkt.",
@@ -143,6 +149,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.GLUT, 1, generic = 1),
             power = 3,
             toughness = 1,
+            subtypes = setOf(Subtype.KRIEGER),
         ),
         CardDef(
             id = "glut_sengender_stoss",
@@ -186,6 +193,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.GLUT, 2, generic = 3),
             power = 5,
             toughness = 4,
+            subtypes = setOf(Subtype.DRACHE),
             keywords = setOf(Keyword.TRAMPELN),
             onResolve = Effect.Schaden(Selector.Feind, Value.of(2)),
             rulesText = "Trampeln. Betritt das Schlachtfeld: 2 Schaden am Gegner.",
@@ -207,9 +215,11 @@ object CardLibrary : CardResolver {
             name = "Glutmeisterin",
             type = CardType.KREATUR,
             aspect = Aspect.GLUT,
+            archetypes = setOf(Subtype.ELEMENTAR),
             cost = Cost.colored(Aspect.GLUT, 2, generic = 2),
             power = 3,
             toughness = 3,
+            subtypes = setOf(Subtype.KRIEGER),
             triggers = listOf(
                 Trigger(
                     event = TriggerEvent.GREIFT_AN,
@@ -220,6 +230,78 @@ object CardLibrary : CardResolver {
             rulesText = "Immer wenn sie angreift, erschaffe einen 1/1 Irrfunken mit Flink.",
             rarity = Rarity.LEGENDAER,
             startsUnlocked = false,
+        ),
+        CardDef(
+            id = "glut_kriegstrommler",
+            name = "Kriegstrommler",
+            type = CardType.KREATUR,
+            aspect = Aspect.GLUT,
+            archetypes = setOf(Subtype.KRIEGER),
+            cost = Cost.colored(Aspect.GLUT, 1, generic = 2),
+            power = 2,
+            toughness = 2,
+            subtypes = setOf(Subtype.KRIEGER),
+            statics = listOf(
+                StaticAbility(
+                    filter = Filter.eigenerStamm(Subtype.KRIEGER),
+                    power = 1,
+                    text = "Andere eigene Krieger erhalten +1/+0.",
+                ),
+            ),
+            rulesText = "Andere eigene Krieger erhalten +1/+0.",
+            rarity = Rarity.SELTEN,
+        ),
+        CardDef(
+            id = "glut_funkenweber",
+            name = "Funkenweber",
+            type = CardType.KREATUR,
+            aspect = Aspect.GLUT,
+            cost = Cost.colored(Aspect.GLUT, 1, generic = 2),
+            power = 2,
+            toughness = 2,
+            subtypes = setOf(Subtype.MAGIER),
+            triggers = listOf(
+                Trigger(
+                    event = TriggerEvent.ZAUBER_GEWIRKT,
+                    effect = Effect.Schaden(Selector.Feind, Value.of(1)),
+                    text = "sengt den Gegner.",
+                ),
+            ),
+            rulesText = "Immer wenn du einen Zauber wirkst, erleidet der Gegner 1 Schaden.",
+            rarity = Rarity.SELTEN,
+        ),
+        CardDef(
+            id = "glut_brandmal",
+            name = "Brandmal",
+            type = CardType.SPONTAN,
+            aspect = Aspect.GLUT,
+            archetypes = setOf(Subtype.ELEMENTAR),
+            cost = Cost.colored(Aspect.GLUT, 1, generic = 1),
+            targets = listOf(zielBeliebig),
+            onResolve = Effect.Schaden(
+                Selector.Chosen(0),
+                Value.basis(2, Filter.eigenerStamm(Subtype.ELEMENTAR)),
+            ),
+            rulesText = "Fuegt einem beliebigen Ziel 2 Schaden zu, plus 1 je eigenem Elementar.",
+        ),
+        CardDef(
+            id = "glut_drachenhort",
+            name = "Drachenhort",
+            type = CardType.RELIKT,
+            aspect = Aspect.GLUT,
+            archetypes = setOf(Subtype.DRACHE),
+            cost = Cost.colored(Aspect.GLUT, 1, generic = 1),
+            statics = listOf(
+                StaticAbility(
+                    filter = Filter.eigenerStamm(Subtype.DRACHE),
+                    power = 1,
+                    toughness = 1,
+                    text = "Eigene Drachen erhalten +1/+1.",
+                ),
+            ),
+            rulesText = "Eigene Drachen erhalten +1/+1.",
+            flavor = "Gold waermt nicht. Es sammelt sich trotzdem.",
+            rarity = Rarity.SELTEN,
         ),
     )
 
@@ -234,6 +316,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.FLUT, 1, generic = 2),
             power = 2,
             toughness = 2,
+            subtypes = setOf(Subtype.GEIST),
             keywords = setOf(Keyword.FLUG),
             onResolve = Effect.Ziehen(Selector.Du, Value.of(1)),
             rulesText = "Flug. Betritt das Schlachtfeld: Ziehe eine Karte.",
@@ -270,6 +353,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.FLUT, 1, generic = 2),
             power = 1,
             toughness = 5,
+            subtypes = setOf(Subtype.BESTIE),
             keywords = setOf(Keyword.REICHWEITE),
             rulesText = "Reichweite.",
         ),
@@ -290,6 +374,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.FLUT, 2, generic = 2),
             power = 2,
             toughness = 3,
+            subtypes = setOf(Subtype.BESTIE),
             keywords = setOf(Keyword.FLUG),
             triggers = listOf(
                 Trigger(
@@ -319,12 +404,81 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.FLUT, 2, generic = 4),
             power = 4,
             toughness = 5,
+            subtypes = setOf(Subtype.MAGIER),
             keywords = setOf(Keyword.FLUG),
             onResolve = Effect.Zurueckgeben(Selector.Chosen(0)),
             targets = listOf(TargetSpec(TargetKind.KREATUR, Filter(types = setOf(CardType.KREATUR), controller = ControllerScope.GEGNERISCHE), optional = true)),
             rulesText = "Flug. Betritt das Schlachtfeld: Bringe eine gegnerische Kreatur auf die Hand zurueck.",
             rarity = Rarity.LEGENDAER,
             startsUnlocked = false,
+        ),
+        CardDef(
+            id = "flut_zirkelmeisterin",
+            name = "Zirkelmeisterin",
+            type = CardType.KREATUR,
+            aspect = Aspect.FLUT,
+            archetypes = setOf(Subtype.MAGIER),
+            cost = Cost.colored(Aspect.FLUT, 2, generic = 2),
+            power = 2,
+            toughness = 3,
+            subtypes = setOf(Subtype.MAGIER),
+            statics = listOf(
+                StaticAbility(
+                    filter = Filter.eigenerStamm(Subtype.MAGIER),
+                    power = 1,
+                    toughness = 1,
+                    text = "Andere eigene Magier erhalten +1/+1.",
+                ),
+            ),
+            rulesText = "Andere eigene Magier erhalten +1/+1.",
+            rarity = Rarity.SELTEN,
+        ),
+        CardDef(
+            id = "flut_arkanes_echo",
+            name = "Arkanes Echo",
+            type = CardType.KREATUR,
+            aspect = Aspect.FLUT,
+            cost = Cost.colored(Aspect.FLUT, 1, generic = 1),
+            power = 1,
+            toughness = 3,
+            subtypes = setOf(Subtype.MAGIER),
+            triggers = listOf(
+                Trigger(
+                    event = TriggerEvent.ZAUBER_GEWIRKT,
+                    effect = Effect.Staerken(Selector.Selbst, power = 1),
+                    text = "verstaerkt sich.",
+                ),
+            ),
+            rulesText = "Immer wenn du einen Zauber wirkst, erhaelt es +1/+0 bis zum Zugende.",
+        ),
+        CardDef(
+            id = "flut_gedankenflut",
+            name = "Gedankenflut",
+            type = CardType.RITUAL,
+            aspect = Aspect.FLUT,
+            cost = Cost.colored(Aspect.FLUT, 1, generic = 2),
+            onResolve = Effect.Wenn(
+                // Der Zauber zaehlt sich selbst mit: Bedingung 3 bedeutet, dass
+                // vorher bereits zwei andere Zauber gewirkt wurden.
+                condition = Condition.Mindestens(Value.ZauberDiesenZug, 3),
+                dann = Effect.Ziehen(Selector.Du, Value.of(3)),
+                sonst = Effect.Ziehen(Selector.Du, Value.of(1)),
+            ),
+            rulesText = "Ziehe eine Karte. Ist dies dein dritter Zauber in diesem Zug, ziehe stattdessen drei.",
+            rarity = Rarity.SELTEN,
+        ),
+        CardDef(
+            id = "flut_nebeldrache",
+            name = "Nebeldrache",
+            type = CardType.KREATUR,
+            aspect = Aspect.FLUT,
+            cost = Cost.colored(Aspect.FLUT, 1, generic = 3),
+            power = 3,
+            toughness = 3,
+            subtypes = setOf(Subtype.DRACHE),
+            keywords = setOf(Keyword.FLUG),
+            rulesText = "Flug.",
+            flavor = "Man hoert ihn erst, wenn der Nebel sich schliesst.",
         ),
     )
 
@@ -339,6 +493,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.ASCHE, 1, generic = 1),
             power = 2,
             toughness = 2,
+            subtypes = setOf(Subtype.UNTOTER),
         ),
         CardDef(
             id = "asche_seelenzehrer",
@@ -348,6 +503,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.ASCHE, 2, generic = 2),
             power = 3,
             toughness = 3,
+            subtypes = setOf(Subtype.GEIST),
             keywords = setOf(Keyword.ZEHRUNG),
             rulesText = "Zehrung.",
         ),
@@ -366,9 +522,11 @@ object CardLibrary : CardResolver {
             name = "Knochensammler",
             type = CardType.KREATUR,
             aspect = Aspect.ASCHE,
+            archetypes = setOf(Subtype.UNTOTER),
             cost = Cost.colored(Aspect.ASCHE, 1, generic = 2),
             power = 2,
             toughness = 2,
+            subtypes = setOf(Subtype.UNTOTER),
             onResolve = Effect.Abwerfen(Selector.Feind, Value.of(1)),
             triggers = listOf(
                 Trigger(
@@ -424,6 +582,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.ASCHE, 1, generic = 4),
             power = 4,
             toughness = 4,
+            subtypes = setOf(Subtype.BESTIE),
             keywords = setOf(Keyword.GIFT),
             rulesText = "Gift.",
         ),
@@ -435,6 +594,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.ASCHE, 2, generic = 3),
             power = 3,
             toughness = 4,
+            subtypes = setOf(Subtype.UNTOTER),
             keywords = setOf(Keyword.FLUG, Keyword.ZEHRUNG),
             triggers = listOf(
                 Trigger(
@@ -450,6 +610,57 @@ object CardLibrary : CardResolver {
             rarity = Rarity.LEGENDAER,
             startsUnlocked = false,
         ),
+        CardDef(
+            id = "asche_gebeinvogt",
+            name = "Gebeinvogt",
+            type = CardType.KREATUR,
+            aspect = Aspect.ASCHE,
+            archetypes = setOf(Subtype.UNTOTER),
+            cost = Cost.colored(Aspect.ASCHE, 2, generic = 1),
+            power = 2,
+            toughness = 2,
+            subtypes = setOf(Subtype.UNTOTER),
+            statics = listOf(
+                StaticAbility(
+                    filter = Filter.eigenerStamm(Subtype.UNTOTER),
+                    power = 1,
+                    toughness = 1,
+                    text = "Andere eigene Untote erhalten +1/+1.",
+                ),
+            ),
+            rulesText = "Andere eigene Untote erhalten +1/+1.",
+            rarity = Rarity.SELTEN,
+        ),
+        CardDef(
+            id = "asche_massengrab",
+            name = "Massengrab",
+            type = CardType.RITUAL,
+            aspect = Aspect.ASCHE,
+            archetypes = setOf(Subtype.UNTOTER),
+            cost = Cost.colored(Aspect.ASCHE, 1, generic = 3),
+            onResolve = Effect.Erschaffen(
+                Selector.Du,
+                "tok_skelett",
+                Value.basis(1, Filter.eigenerStamm(Subtype.UNTOTER)),
+            ),
+            rulesText = "Erschaffe einen 1/1 Knochendiener, plus einen je eigenem Untoten.",
+            rarity = Rarity.SELTEN,
+        ),
+        CardDef(
+            id = "asche_knochendrache",
+            name = "Knochendrache",
+            type = CardType.KREATUR,
+            aspect = Aspect.ASCHE,
+            cost = Cost.colored(Aspect.ASCHE, 1, generic = 4),
+            power = 4,
+            toughness = 4,
+            // Gehoert beiden Staemmen an - damit haben Untoten-Decks eine Spitze
+            // und Drachen-Decks einen Anschluss an den Friedhof.
+            subtypes = setOf(Subtype.DRACHE, Subtype.UNTOTER),
+            keywords = setOf(Keyword.FLUG),
+            rulesText = "Flug.",
+            rarity = Rarity.SELTEN,
+        ),
     )
 
     // ---------------------------------------------------------------- Hain
@@ -463,6 +674,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.HAIN, 1, generic = 1),
             power = 1,
             toughness = 3,
+            subtypes = setOf(Subtype.ELEMENTAR),
             activated = listOf(
                 ActivatedAbility(
                     tapSelf = true,
@@ -480,6 +692,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.HAIN, 1, generic = 1),
             power = 3,
             toughness = 2,
+            subtypes = setOf(Subtype.BESTIE),
         ),
         CardDef(
             id = "hain_lebensfluss",
@@ -498,6 +711,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.HAIN, 1, generic = 2),
             power = 2,
             toughness = 4,
+            subtypes = setOf(Subtype.ELEMENTAR),
             keywords = setOf(Keyword.REICHWEITE),
             rulesText = "Reichweite.",
         ),
@@ -534,6 +748,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.HAIN, 2, generic = 4),
             power = 7,
             toughness = 7,
+            subtypes = setOf(Subtype.BESTIE),
             keywords = setOf(Keyword.TRAMPELN),
             rulesText = "Trampeln.",
             rarity = Rarity.SELTEN,
@@ -546,6 +761,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.HAIN, 2, generic = 2),
             power = 3,
             toughness = 3,
+            subtypes = setOf(Subtype.KRIEGER),
             triggers = listOf(
                 Trigger(
                     event = TriggerEvent.ANDERE_KREATUR_BETRITT,
@@ -554,9 +770,54 @@ object CardLibrary : CardResolver {
                     text = "waechst um +1/+1.",
                 ),
             ),
-            rulesText = "Immer wenn eine andere eigene Kreatur ins Spiel kommt, erhaelt sie dauerhaft +1/+1.",
+            rulesText = "Immer wenn eine andere eigene Kreatur ins Spiel kommt, waechst die Hueterin dauerhaft um +1/+1.",
             rarity = Rarity.LEGENDAER,
             startsUnlocked = false,
+        ),
+        CardDef(
+            id = "hain_rudelaeltester",
+            name = "Rudelaeltester",
+            type = CardType.KREATUR,
+            aspect = Aspect.HAIN,
+            archetypes = setOf(Subtype.BESTIE),
+            cost = Cost.colored(Aspect.HAIN, 2, generic = 2),
+            power = 3,
+            toughness = 3,
+            subtypes = setOf(Subtype.BESTIE),
+            statics = listOf(
+                StaticAbility(
+                    filter = Filter.eigenerStamm(Subtype.BESTIE),
+                    power = 1,
+                    toughness = 1,
+                    text = "Andere eigene Bestien erhalten +1/+1.",
+                ),
+            ),
+            rulesText = "Andere eigene Bestien erhalten +1/+1.",
+            rarity = Rarity.SELTEN,
+        ),
+        CardDef(
+            id = "hain_meutenruf",
+            name = "Meutenruf",
+            type = CardType.RITUAL,
+            aspect = Aspect.HAIN,
+            archetypes = setOf(Subtype.BESTIE),
+            cost = Cost.colored(Aspect.HAIN, 1, generic = 2),
+            onResolve = Effect.Erschaffen(Selector.Du, "tok_wolf", Value.of(2)),
+            rulesText = "Erschaffe zwei 2/2 Dickichtwoelfe.",
+        ),
+        CardDef(
+            id = "hain_urinstinkt",
+            name = "Urinstinkt",
+            type = CardType.SPONTAN,
+            aspect = Aspect.HAIN,
+            archetypes = setOf(Subtype.BESTIE),
+            cost = Cost.colored(Aspect.HAIN, 1, generic = 1),
+            onResolve = Effect.Staerken(
+                Selector.Alle(Filter.eigenerStamm(Subtype.BESTIE)),
+                power = 2,
+                toughness = 2,
+            ),
+            rulesText = "Eigene Bestien erhalten +2/+2 bis zum Zugende.",
         ),
     )
 
@@ -571,6 +832,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.LICHT, 1, generic = 1),
             power = 2,
             toughness = 3,
+            subtypes = setOf(Subtype.KRIEGER),
             keywords = setOf(Keyword.WACHT),
             rulesText = "Wacht.",
         ),
@@ -582,6 +844,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.LICHT, 1, generic = 1),
             power = 2,
             toughness = 2,
+            subtypes = setOf(Subtype.GEIST),
             keywords = setOf(Keyword.FLUG),
             rulesText = "Flug.",
         ),
@@ -599,6 +862,7 @@ object CardLibrary : CardResolver {
             name = "Aufgebot",
             type = CardType.RITUAL,
             aspect = Aspect.LICHT,
+            archetypes = setOf(Subtype.GEIST),
             cost = Cost.colored(Aspect.LICHT, 1, generic = 2),
             onResolve = Effect.Erschaffen(Selector.Du, "tok_waechter", Value.of(3)),
             rulesText = "Erschaffe drei 1/1 Schildgeister.",
@@ -637,6 +901,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.LICHT, 2, generic = 3),
             power = 3,
             toughness = 4,
+            subtypes = setOf(Subtype.KRIEGER),
             statics = listOf(
                 StaticAbility(
                     filter = Filter(types = setOf(CardType.KREATUR), controller = ControllerScope.EIGENE),
@@ -656,6 +921,7 @@ object CardLibrary : CardResolver {
             cost = Cost.colored(Aspect.LICHT, 2, generic = 2),
             power = 2,
             toughness = 5,
+            subtypes = setOf(Subtype.GEIST),
             keywords = setOf(Keyword.WACHT, Keyword.FLUG),
             triggers = listOf(
                 Trigger(
@@ -672,6 +938,40 @@ object CardLibrary : CardResolver {
             rarity = Rarity.LEGENDAER,
             startsUnlocked = false,
         ),
+        CardDef(
+            id = "licht_bannerherrin",
+            name = "Bannerherrin",
+            type = CardType.KREATUR,
+            aspect = Aspect.LICHT,
+            archetypes = setOf(Subtype.KRIEGER),
+            cost = Cost.colored(Aspect.LICHT, 2, generic = 1),
+            power = 2,
+            toughness = 3,
+            subtypes = setOf(Subtype.KRIEGER),
+            statics = listOf(
+                StaticAbility(
+                    filter = Filter.eigenerStamm(Subtype.KRIEGER),
+                    power = 1,
+                    toughness = 1,
+                    text = "Andere eigene Krieger erhalten +1/+1.",
+                ),
+            ),
+            rulesText = "Andere eigene Krieger erhalten +1/+1.",
+            rarity = Rarity.SELTEN,
+        ),
+        CardDef(
+            id = "licht_geisterrufer",
+            name = "Geisterrufer",
+            type = CardType.KREATUR,
+            aspect = Aspect.LICHT,
+            archetypes = setOf(Subtype.GEIST),
+            cost = Cost.colored(Aspect.LICHT, 1, generic = 2),
+            power = 2,
+            toughness = 2,
+            subtypes = setOf(Subtype.GEIST),
+            onResolve = Effect.Erschaffen(Selector.Du, "tok_waechter", Value.of(1)),
+            rulesText = "Betritt das Schlachtfeld: Erschaffe einen 1/1 Schildgeist.",
+        ),
     )
 
     // ------------------------------------------------------------- Neutral
@@ -685,6 +985,7 @@ object CardLibrary : CardResolver {
             cost = Cost(generic = 3),
             power = 3,
             toughness = 3,
+            subtypes = setOf(Subtype.KONSTRUKT),
         ),
         CardDef(
             id = "neutral_kristallsplitter",
@@ -709,6 +1010,7 @@ object CardLibrary : CardResolver {
             cost = Cost(generic = 4),
             power = 4,
             toughness = 3,
+            subtypes = setOf(Subtype.KRIEGER),
             onResolve = Effect.Ziehen(Selector.Du, Value.of(1)),
             rulesText = "Betritt das Schlachtfeld: Ziehe eine Karte.",
         ),
@@ -723,6 +1025,31 @@ object CardLibrary : CardResolver {
             rulesText = "Verbrauch. Zerstoere alle Kreaturen.",
             rarity = Rarity.LEGENDAER,
             startsUnlocked = false,
+        ),
+        CardDef(
+            id = "neutral_schildwall",
+            name = "Schildwall",
+            type = CardType.KREATUR,
+            aspect = Aspect.NEUTRAL,
+            cost = Cost(generic = 2),
+            power = 0,
+            toughness = 5,
+            subtypes = setOf(Subtype.KONSTRUKT),
+            keywords = setOf(Keyword.WAECHTER),
+            rulesText = "Waechter.",
+            flavor = "Es hat nie einen Schritt getan.",
+        ),
+        CardDef(
+            id = "neutral_bergungskonstrukt",
+            name = "Bergungskonstrukt",
+            type = CardType.KREATUR,
+            aspect = Aspect.NEUTRAL,
+            cost = Cost(generic = 4),
+            power = 2,
+            toughness = 3,
+            subtypes = setOf(Subtype.KONSTRUKT),
+            onResolve = Effect.Wiederbeleben(Selector.Du, maxCost = 2),
+            rulesText = "Betritt das Schlachtfeld: Bringe eine Kreatur mit Kosten bis 2 aus deinem Friedhof ins Spiel.",
         ),
     )
 

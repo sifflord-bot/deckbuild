@@ -457,6 +457,9 @@ class Battle(
             ),
         )
         say("${nameOf(side)} antwortet mit ${card.def.name}.", side)
+        // Auch ein Antwortzauber ist ein gewirkter Zauber - sonst haetten
+        // Zauber-Ausloeser je nach Zeitpunkt unterschiedliche Regeln.
+        fireTriggers(TriggerEvent.ZAUBER_GEWIRKT, side)
         return ActionResult.OK
     }
 
@@ -1152,8 +1155,10 @@ class Battle(
     private fun evaluate(value: Value, ctx: EffectContext): Int = when (value) {
         is Value.Fixed -> value.amount
         is Value.Count -> selectWithViewpoint(value.filter, ctx).size
+        is Value.Summe -> value.values.sumOf { evaluate(it, ctx) }
         Value.Friedhof -> state.stateOf(ctx.controller).graveyard.size
         Value.FehlendeLeben -> state.stateOf(ctx.controller).missingLife
+        Value.ZauberDiesenZug -> state.stateOf(ctx.controller).spellsCastThisTurn
     }
 
     private fun evaluate(condition: Condition, ctx: EffectContext): Boolean = when (condition) {

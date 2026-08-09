@@ -13,6 +13,7 @@ import dev.deckbuild.core.model.CardDef
 import dev.deckbuild.core.model.CardType
 import dev.deckbuild.core.model.ConsumableSlot
 import dev.deckbuild.core.model.Rarity
+import dev.deckbuild.core.model.Subtype
 import dev.deckbuild.core.util.Rng
 
 /**
@@ -192,17 +193,39 @@ object RunManager {
         val pool = CardLibrary.spells.filter { meta.isCardUnlocked(it.id) && it.type != CardType.QUELLE }
         if (pool.isEmpty()) return emptyList()
 
+        val synergy = synergyTribes(run)
         val picks = mutableListOf<String>()
         var guard = 0
         while (picks.size < CARD_CHOICES && guard++ < 200) {
-            val card = rng.weighted(pool) { weightFor(it, pathAspect, run.tier, boss) } ?: break
+            val card = rng.weighted(pool) { weightFor(it, pathAspect, run.tier, boss, synergy) } ?: break
             if (card.id in picks) continue
             picks += card.id
         }
         return picks
     }
 
-    private fun weightFor(card: CardDef, pathAspect: Aspect, tier: Int, boss: Boolean): Int {
+    /**
+     * Staemme, die im Deck bereits Substanz haben.
+     *
+     * Ohne diese Kopplung wuerde ein wachsender Kartenpool die Belohnungen
+     * beliebiger machen statt reichhaltiger: Drei zufaellige Karten aus
+     * zweihundert treffen fast nie das, woran man gerade baut.
+     */
+    fun synergyTribes(run: RunState, threshold: Int = 3): Set<Subtype> =
+        run.deck.mapNotNull { CardLibrary.find(it) }
+            .flatMap { it.subtypes }
+            .groupingBy { it }
+            .eachCount()
+            .filterValues { it >= threshold }
+            .keys
+
+    private fun weightFor(
+        card: CardDef,
+        pathAspect: Aspect,
+        tier: Int,
+        boss: Boolean,
+        synergy: Set<Subtype> = emptySet(),
+    ): Int {
         val aspectFactor = when (card.aspect) {
             pathAspect -> 6
             Aspect.NEUTRAL -> 3
@@ -215,7 +238,10 @@ object RunManager {
         }
         // Sehr teure Karten erst anbieten, wenn der Lauf sie auch bezahlen kann.
         val costFactor = if (card.manaValue > 3 + tier) 0 else 1
-        return aspectFactor * rarityFactor * costFactor
+        // Passt die Karte zu einem Stamm im Deck, wird sie deutlich haeufiger
+        // angeboten - so verdichtet sich ein Deck ueber den Lauf hinweg.
+        val synergyFactor = if (card.relatedSubtypes.any { it in synergy }) 3 else 1
+        return aspectFactor * rarityFactor * costFactor * synergyFactor
     }
 
     /** Belohnung annehmen; [cardId] = null bedeutet ueberspringen gegen Gold. */
@@ -280,9 +306,12 @@ object RunManager {
         val pathAspect = StarterDecks.find(run.pathId)?.aspect ?: Aspect.NEUTRAL
         val offers = mutableListOf<ShopOffer>()
 
+        val synergy = synergyTribes(run)
         val cardPool = CardLibrary.spells.filter { it.type != CardType.QUELLE }
         repeat(3) {
-            val card = rng.weighted(cardPool) { weightFor(it, pathAspect, run.tier, boss = false) } ?: return@repeat
+            val card = rng.weighted(cardPool) {
+                weightFor(it, pathAspect, run.tier, boss = false, synergy = synergy)
+            } ?: return@repeat
             if (offers.any { it.id == card.id }) return@repeat
             val price = 35 + card.manaValue * 12 + when (card.rarity) {
                 Rarity.HAEUFIG -> 0

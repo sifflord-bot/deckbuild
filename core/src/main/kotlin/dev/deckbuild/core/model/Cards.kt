@@ -30,6 +30,22 @@ enum class CardType(val label: String) {
     val isPermanent: Boolean get() = this == QUELLE || this == KREATUR || this == RELIKT
 }
 
+/**
+ * Kreaturentypen. Sie tragen keine eigene Regel, sondern sind der Anknuepfungs-
+ * punkt fuer Stammes-Synergien: Anfuehrer staerken ihren Typ, Zahlungen zaehlen
+ * ihn. Bewusst wenige Typen - ein Stamm mit drei Karten ist kein Archetyp.
+ */
+enum class Subtype(val label: String, val plural: String) {
+    KRIEGER("Krieger", "Krieger"),
+    MAGIER("Magier", "Magier"),
+    GEIST("Geist", "Geister"),
+    BESTIE("Bestie", "Bestien"),
+    UNTOTER("Untoter", "Untote"),
+    ELEMENTAR("Elementar", "Elementare"),
+    KONSTRUKT("Konstrukt", "Konstrukte"),
+    DRACHE("Drache", "Drachen"),
+}
+
 enum class Rarity(val label: String, val weight: Int) {
     HAEUFIG("Haeufig", 60),
     SELTEN("Selten", 30),
@@ -100,6 +116,8 @@ enum class ControllerScope { EIGENE, GEGNERISCHE, BELIEBIGE }
 data class Filter(
     val types: Set<CardType> = emptySet(),
     val aspects: Set<Aspect> = emptySet(),
+    /** Trifft, wenn die Kreatur mindestens einen dieser Typen hat. */
+    val subtypes: Set<Subtype> = emptySet(),
     val keywords: Set<Keyword> = emptySet(),
     val excludedKeywords: Set<Keyword> = emptySet(),
     val controller: ControllerScope = ControllerScope.BELIEBIGE,
@@ -114,6 +132,14 @@ data class Filter(
         val EIGENE_KREATUREN = Filter(types = setOf(CardType.KREATUR), controller = ControllerScope.EIGENE)
         val GEGNERISCHE_KREATUREN = Filter(types = setOf(CardType.KREATUR), controller = ControllerScope.GEGNERISCHE)
         val ALLE_PERMANENTEN = Filter()
+
+        /** Eigene Kreaturen eines Stammes - Grundlage aller Anfuehrer und Zahlungen. */
+        fun eigenerStamm(subtype: Subtype, excludeSelf: Boolean = false) = Filter(
+            types = setOf(CardType.KREATUR),
+            subtypes = setOf(subtype),
+            controller = ControllerScope.EIGENE,
+            excludeSelf = excludeSelf,
+        )
     }
 }
 
@@ -130,8 +156,23 @@ sealed interface Value {
     /** Fehlende Lebenspunkte des Beherrschers (fuer Comeback-Effekte). */
     data object FehlendeLeben : Value
 
+    /** Zauber, die der Beherrscher in diesem Zug bereits gewirkt hat. */
+    data object ZauberDiesenZug : Value
+
+    /**
+     * Summe mehrerer Werte. Erst damit lassen sich Zahlungen der Form
+     * "2 Schaden, plus 1 je eigenem Elementar" ueberhaupt ausdruecken.
+     */
+    data class Summe(val values: List<Value>) : Value
+
     companion object {
         fun of(amount: Int): Value = Fixed(amount)
+
+        fun plus(vararg values: Value): Value = Summe(values.toList())
+
+        /** Grundwert plus einen Zaehler - die haeufigste Form einer Stammes-Zahlung. */
+        fun basis(amount: Int, proStueck: Filter): Value =
+            Summe(listOf(Fixed(amount), Count(proStueck)))
     }
 }
 
@@ -277,6 +318,17 @@ data class CardDef(
     val cost: Cost = Cost.FREE,
     val power: Int = 0,
     val toughness: Int = 0,
+    /** Kreaturentypen; bei Nichtkreaturen leer. */
+    val subtypes: Set<Subtype> = emptySet(),
+    /**
+     * Staemme, auf die diese Karte hinarbeitet, ohne ihnen selbst anzugehoeren -
+     * etwa ein Zauber, der alle Bestien staerkt, oder ein Anfuehrer.
+     *
+     * Bewusst von Hand gesetzt statt aus dem Effektbaum abgeleitet: Die Angabe
+     * steuert, welche Belohnungen ein Deck bekommt, und diese Entscheidung soll
+     * beim Kartenentwurf getroffen werden, nicht von einer Heuristik.
+     */
+    val archetypes: Set<Subtype> = emptySet(),
     val keywords: Set<Keyword> = emptySet(),
     val targets: List<TargetSpec> = emptyList(),
     /** Wirkung eines Zaubers bzw. Betritt-das-Schlachtfeld-Effekt eines Permanenten. */
@@ -295,6 +347,17 @@ data class CardDef(
 ) {
     val isCreature: Boolean get() = type == CardType.KREATUR
     val isSource: Boolean get() = type == CardType.QUELLE
+
+    /** Alle Staemme, zu denen diese Karte einen Bezug hat. */
+    val relatedSubtypes: Set<Subtype> get() = subtypes + archetypes
+
+    /** Typzeile fuer die Kartenansicht, z. B. "Kreatur - Bestie". */
+    val typeLine: String
+        get() = if (subtypes.isEmpty()) {
+            type.label
+        } else {
+            "${type.label} - ${subtypes.joinToString(" ") { it.label }}"
+        }
 
     /** Grobe Deckbau-Kennzahl fuer KI-Bewertung und Belohnungsgewichtung. */
     val manaValue: Int get() = cost.total

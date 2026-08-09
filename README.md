@@ -25,6 +25,17 @@ zu, dann fällt Kampfschaden — mit einem eigenen Schritt für Vorstoß.
 **Schlüsselwörter.** Flink, Wacht, Flug, Reichweite, Trampeln, Vorstoß, Gift,
 Zehrung, Wächter, Verschleiert, Schild und Verbrauch.
 
+**Stämme.** Kreaturen tragen Typen — Krieger, Magier, Geist, Bestie, Untoter,
+Elementar, Konstrukt, Drache. Anführer stärken ihren Stamm, Zahlungen zählen
+ihn („2 Schaden, plus 1 je eigenem Elementar"). Daneben gibt es eine
+Zauber-Achse: Karten, die auslösen, sobald man einen Zauber wirkt.
+
+Damit ein wachsender Kartenpool die Belohnungen nicht beliebiger macht, sind
+Karten mit dem Stamm markiert, für den sie gebaut sind. Sobald ein Deck drei
+Kreaturen eines Stammes enthält, werden passende Karten dreifach gewichtet
+angeboten — ein Deck verdichtet sich also über den Lauf hinweg, statt zufällig
+zu wachsen.
+
 **Verbrauch gibt es zweifach.** Karten mit dem Schlüsselwort *Verbrauch* werden
 nach dem Ausspielen verbannt statt abgelegt. Daneben trägt man bis zu drei
 Verbrauchsgegenstände im Beutel: Sie kosten keine Essenz, wirken auch mitten im
@@ -93,9 +104,14 @@ Mindest-SDK ist 26, Ziel-SDK 35.
 
 ## Tests
 
-Rund 70 Tests decken den Regelkern und den Spielablauf ab: Kostenberechnung,
-Kampf mit allen Schlüsselwörtern, Zauber und Stapel, Laufsteuerung, Speicherstand
-und der komplette Bildschirmablauf einer Sitzung.
+Rund 88 Tests decken den Regelkern und den Spielablauf ab: Kostenberechnung,
+Kampf mit allen Schlüsselwörtern, Zauber und Stapel, Stammes-Synergien,
+Laufsteuerung, Speicherstand und der komplette Bildschirmablauf einer Sitzung.
+
+Einige davon sind Wächtertests über die Kartenliste selbst: Jede Kreatur braucht
+einen Typ, jeder Stamm mindestens drei Karten, und wer einen Stamm mechanisch
+anspricht, muss ihn auch als Archetyp führen. Beim Nachliefern neuer Karten
+schlagen sie an, bevor ein Stamm still verkümmert.
 
 Dazu simuliert `SimulationTest` vollständige Partien: Die Heuristik-KI übernimmt
 beide Seiten und spielt jede Kombination aus Startpfad und Gegner über mehrere
@@ -112,3 +128,6 @@ Sinnvolle Erweiterungen:
 - Freie Prioritätsfenster statt eines Antwortfensters pro Spielerzauber
 - Deckbau zwischen den Läufen und mehr Karten pro Aspekt
 - Kartenveredelung an Rastplätzen als zusätzliche Fortschrittsachse
+- Modale Karten, X-Kosten, Marken-Zahlungen und ein Opfer-Auslöser („wenn eine
+  andere Kreatur stirbt") — die vier Mechaniken, die das Effekt-Vokabular am
+  stärksten verbreitern

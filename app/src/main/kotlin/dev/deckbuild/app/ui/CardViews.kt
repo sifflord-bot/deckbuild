@@ -118,10 +118,11 @@ fun CardFace(
         Spacer(Modifier.height(3.dp))
 
         Text(
-            text = def.type.label + if (def.aspect != Aspect.NEUTRAL) " · ${def.aspect.label}" else "",
+            text = def.typeLine + if (def.aspect != Aspect.NEUTRAL) " · ${def.aspect.label}" else "",
             style = MaterialTheme.typography.labelSmall,
             color = colors.glow,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
 
         Text(
