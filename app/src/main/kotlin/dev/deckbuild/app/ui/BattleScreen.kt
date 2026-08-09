@@ -23,6 +23,10 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -39,6 +43,8 @@ import dev.deckbuild.core.engine.Phase
 import dev.deckbuild.core.engine.TargetRef
 import dev.deckbuild.core.model.CardType
 import dev.deckbuild.core.model.Side
+import dev.deckbuild.core.session.CastStage
+import dev.deckbuild.core.session.TargetingState
 
 @Composable
 fun BattleScreen(controller: GameController) {
@@ -257,14 +263,21 @@ private fun PermanentChip(battle: Battle, controller: GameController, permanent:
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val status = when {
-                permanent.attacking -> "⚔"
-                blockedTargetId != null -> "⛨"
-                permanent.summoningSick && permanent.def.type == CardType.KREATUR -> "z"
-                permanent.tapped -> "↻"
-                else -> ""
+            val status = buildString {
+                when {
+                    permanent.attacking -> append("⚔")
+                    blockedTargetId != null -> append("⛨")
+                    permanent.summoningSick && permanent.def.type == CardType.KREATUR -> append("z")
+                    permanent.tapped -> append("↻")
+                }
+                // Marken sichtbar machen: Sie sind dauerhaft und veraendern das
+                // Kampfrechnen, anders als Verstaerkungen bis zum Zugende.
+                if (permanent.counterPower != 0) {
+                    if (isNotEmpty()) append(" ")
+                    append(if (permanent.counterPower > 0) "+${permanent.counterPower}" else "${permanent.counterPower}")
+                }
             }
-            Text(status, style = MaterialTheme.typography.labelSmall, color = Palette.Danger)
+            Text(status, style = MaterialTheme.typography.labelSmall, color = Palette.Gold)
 
             if (permanent.def.type == CardType.KREATUR) {
                 Text(
@@ -285,28 +298,7 @@ private fun MiddleStrip(battle: Battle, controller: GameController, modifier: Mo
 
     Column(modifier.fillMaxWidth()) {
         if (targeting != null) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Palette.Gold.copy(alpha = 0.18f))
-                    .border(1.dp, Palette.Gold, RoundedCornerShape(6.dp))
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    targeting.currentSpec?.prompt ?: "Ziel waehlen",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Palette.Gold,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    "Abbrechen",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Palette.Danger,
-                    modifier = Modifier.clickable { controller.cancelTargeting() },
-                )
-            }
+            CastPrompt(targeting, controller)
             Spacer(Modifier.height(4.dp))
         }
 
@@ -360,6 +352,111 @@ private fun MiddleStrip(battle: Battle, controller: GameController, modifier: Mo
             }
         }
     }
+}
+
+/**
+ * Aufforderung waehrend einer Wirkung in Vorbereitung: erst Modus, dann X,
+ * dann Ziele. Welche Stufe gerade ansteht, entscheidet die Sitzung.
+ */
+@Composable
+private fun CastPrompt(targeting: TargetingState, controller: GameController) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(Palette.Gold.copy(alpha = 0.18f))
+            .border(1.dp, Palette.Gold, RoundedCornerShape(6.dp))
+            .padding(8.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = when (targeting.stage) {
+                    CastStage.MODUS -> "${targeting.cardName}: Waehle eins"
+                    CastStage.X_WERT -> "${targeting.cardName}: Wie viel Essenz fuer X?"
+                    else -> targeting.currentSpec?.prompt ?: "Ziel waehlen"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = Palette.Gold,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                "Abbrechen",
+                style = MaterialTheme.typography.labelSmall,
+                color = Palette.Danger,
+                modifier = Modifier.clickable { controller.cancelTargeting() },
+            )
+        }
+
+        when (targeting.stage) {
+            CastStage.MODUS -> {
+                Spacer(Modifier.height(6.dp))
+                targeting.modes.forEachIndexed { index, mode ->
+                    Text(
+                        text = "${index + 1}. ${mode.label}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Palette.TextPrimary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Palette.SurfaceHigh)
+                            .clickable { controller.chooseMode(index) }
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                    )
+                }
+            }
+
+            CastStage.X_WERT -> {
+                Spacer(Modifier.height(6.dp))
+                XPicker(maxX = targeting.maxX) { controller.chooseX(it) }
+            }
+
+            else -> Unit
+        }
+    }
+}
+
+/** Schrittweise Auswahl von X - bewusst als Tastenreihe statt Schieberegler. */
+@Composable
+private fun XPicker(maxX: Int, onPick: (Int) -> Unit) {
+    var value by remember(maxX) { mutableIntStateOf(maxX) }
+
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        StepButton("−") { if (value > 0) value-- }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            "X = $value",
+            style = MaterialTheme.typography.titleSmall,
+            color = Palette.TextPrimary,
+        )
+        Spacer(Modifier.width(10.dp))
+        StepButton("+") { if (value < maxX) value++ }
+        Spacer(Modifier.width(14.dp))
+        Text(
+            "Bestaetigen",
+            style = MaterialTheme.typography.labelSmall,
+            color = Palette.Gold,
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(Palette.Gold.copy(alpha = 0.25f))
+                .clickable { onPick(value) }
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+        )
+    }
+}
+
+@Composable
+private fun StepButton(label: String, onClick: () -> Unit) {
+    Text(
+        label,
+        style = MaterialTheme.typography.titleSmall,
+        color = Palette.TextPrimary,
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(Palette.SurfaceHigh)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+    )
 }
 
 // -------------------------------------------------------------------- Beutel

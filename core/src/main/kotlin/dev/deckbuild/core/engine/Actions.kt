@@ -8,7 +8,14 @@ sealed interface GameAction {
     /** Eine beliebige Handkarte verdeckt als farblose Quelle legen (einmal pro Zug). */
     data class VerdecktLegen(val instanceId: Int) : GameAction
 
-    data class KarteSpielen(val instanceId: Int, val targets: List<TargetRef> = emptyList()) : GameAction
+    data class KarteSpielen(
+        val instanceId: Int,
+        val targets: List<TargetRef> = emptyList(),
+        /** Gewaehlter Wert von X bei variablen Kosten. */
+        val x: Int = 0,
+        /** Gewaehlter Modus bei modalen Karten. */
+        val modeIndex: Int = 0,
+    ) : GameAction
 
     data class FaehigkeitAktivieren(
         val permanentId: Int,

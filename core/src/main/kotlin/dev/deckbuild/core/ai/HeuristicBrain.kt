@@ -108,9 +108,57 @@ class HeuristicBrain(
             .filter { battle.canCast(side, it) }
 
         val best = candidates.maxByOrNull { handValue(battle, it, side) } ?: return null
-        val targets = battle.autoTargets(best.def.targets, side, null)
-        if (best.def.targets.any { !it.optional } && targets.any { it is TargetRef.None }) return null
-        return GameAction.KarteSpielen(best.instanceId, targets)
+        val mode = chooseMode(battle, side, best)
+        val specs = best.def.targetsFor(mode)
+        val targets = battle.autoTargets(specs, side, null)
+        if (specs.any { !it.optional } && targets.any { it is TargetRef.None }) return null
+
+        // X so gross wie bezahlbar: Alle hier eingesetzten X-Karten skalieren
+        // linear, also ist "alles ausgeben" die richtige Naeherung.
+        val x = if (best.def.cost.hasX) battle.state.maxAffordableX(side, best.def.cost) else 0
+        if (best.def.cost.hasX && x <= 0) return null
+
+        return GameAction.KarteSpielen(best.instanceId, targets, x = x, modeIndex = mode)
+    }
+
+    /**
+     * Waehlt den Modus einer modalen Karte. Bewertet wird jeder Modus mit
+     * derselben Materialfunktion, die auch Angriffe und Bloecke bewertet.
+     */
+    private fun chooseMode(battle: Battle, side: Side, card: CardInstance): Int {
+        val def = card.def
+        if (!def.isModal) return 0
+        val usable = battle.castableModes(side, def)
+        if (usable.isEmpty()) return 0
+        if (skill == BrainSkill.EINFACH) return usable.first()
+
+        return usable.maxByOrNull { index -> modeScore(battle, side, def.modes[index].effect) } ?: usable.first()
+    }
+
+    /** Grobe Nutzenschaetzung eines Effekts fuer die Modusauswahl. */
+    private fun modeScore(battle: Battle, side: Side, effect: Effect): Int {
+        val state = battle.state
+        val bestEnemy = state.creatures(side.other).maxOfOrNull { value(battle, it) } ?: 0
+        val enemyLife = state.stateOf(side.other).life
+        val ownLife = state.stateOf(side).life
+
+        return when (effect) {
+            is Effect.Zerstoeren, is Effect.Verbannen -> bestEnemy + 2
+            is Effect.Zurueckgeben -> bestEnemy / 2
+            is Effect.Schaden -> if (enemyLife <= 6) 20 else 6
+            is Effect.Heilung -> if (ownLife * 2 <= state.stateOf(side).maxLife) 10 else 2
+            is Effect.Ziehen -> 7
+            is Effect.Erschaffen -> 8
+            is Effect.Marken -> 6
+            is Effect.Wiederbeleben -> 9
+            is Effect.Abwerfen -> 4
+            is Effect.Antappen -> 5
+            is Effect.Essenz -> 5
+            is Effect.Staerken -> if (state.creatures(side).isEmpty()) 0 else 6
+            is Effect.Kette -> effect.effects.maxOfOrNull { modeScore(battle, side, it) } ?: 0
+            is Effect.Wenn -> modeScore(battle, side, effect.dann)
+            else -> 3
+        }
     }
 
     private fun pickSourceToPlay(battle: Battle, side: Side): CardInstance? {

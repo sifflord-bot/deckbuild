@@ -84,6 +84,9 @@ class Battle(
 
     private var startingPlayerFirstTurn = true
 
+    /** Verschachtelungstiefe der gerade laufenden Ausloeser. */
+    private var triggerDepth = 0
+
     init {
         state.player.maxLife = playerLife
         state.opponent.maxLife = opponentLife
@@ -215,7 +218,7 @@ class Battle(
                 if (awaiting == Awaiting.SPIELER_BLOCK && card.def.type != CardType.SPONTAN) {
                     ActionResult.fail("Im Blockschritt sind nur Spontanzauber moeglich.")
                 } else {
-                    castCard(Side.SPIELER, action.instanceId, action.targets)
+                    castCard(Side.SPIELER, action.instanceId, action.targets, action.x, action.modeIndex)
                 }
             }
 
@@ -340,7 +343,8 @@ class Battle(
     private fun applyBrainAction(action: GameAction): ActionResult = when (action) {
         is GameAction.QuelleSpielen -> playSource(Side.GEGNER, action.instanceId, faceDown = false)
         is GameAction.VerdecktLegen -> playSource(Side.GEGNER, action.instanceId, faceDown = true)
-        is GameAction.KarteSpielen -> castCard(Side.GEGNER, action.instanceId, action.targets)
+        is GameAction.KarteSpielen ->
+            castCard(Side.GEGNER, action.instanceId, action.targets, action.x, action.modeIndex)
         is GameAction.FaehigkeitAktivieren ->
             activateAbility(Side.GEGNER, action.permanentId, action.abilityIndex, action.targets)
         else -> ActionResult.fail("Ungueltige KI-Aktion.")
@@ -379,13 +383,22 @@ class Battle(
         return ActionResult.OK
     }
 
-    private fun castCard(side: Side, instanceId: Int, targets: List<TargetRef>): ActionResult {
+    private fun castCard(
+        side: Side,
+        instanceId: Int,
+        targets: List<TargetRef>,
+        x: Int = 0,
+        modeIndex: Int = 0,
+    ): ActionResult {
         val playerState = state.stateOf(side)
         val card = playerState.hand.firstOrNull { it.instanceId == instanceId }
             ?: return ActionResult.fail("Karte nicht auf der Hand.")
         val def = card.def
 
         if (def.type == CardType.QUELLE) return ActionResult.fail("Quellen werden gelegt, nicht gewirkt.")
+        if (def.isModal && def.modes.getOrNull(modeIndex) == null) {
+            return ActionResult.fail("Ungueltiger Modus.")
+        }
 
         val slowSpell = def.type != CardType.SPONTAN
         if (slowSpell) {
@@ -396,10 +409,11 @@ class Battle(
             if (state.stack.isNotEmpty()) return ActionResult.fail("Der Stapel ist nicht leer.")
         }
 
-        val validation = validateTargets(def.targets, targets, side)
+        val chosenX = if (def.cost.hasX) x.coerceAtLeast(0) else 0
+        val validation = validateTargets(def.targetsFor(modeIndex), targets, side)
         if (!validation.ok) return validation
 
-        val payment = EssenceSolver.solve(state, side, def.cost)
+        val payment = EssenceSolver.solve(state, side, def.cost.withX(chosenX))
             ?: return ActionResult.fail("Nicht genug Essenz fuer ${def.name}.")
 
         EssenceSolver.apply(state, side, payment)
@@ -413,11 +427,17 @@ class Battle(
             sourceName = def.name,
             card = card,
             sourcePermanent = null,
-            effect = def.onResolve,
+            effect = def.effectFor(modeIndex),
             targets = targets,
+            xValue = chosenX,
+            modeIndex = modeIndex,
         )
         state.stack.addLast(item)
-        say("${nameOf(side)} wirkt ${def.name}.", side)
+        val zusatz = buildString {
+            if (def.isModal) append(" (${def.modes[modeIndex].label})")
+            if (def.cost.hasX) append(" mit X=$chosenX")
+        }
+        say("${nameOf(side)} wirkt ${def.name}$zusatz.", side)
         fireTriggers(TriggerEvent.ZAUBER_GEWIRKT, side)
 
         offerResponse(side)
@@ -477,7 +497,10 @@ class Battle(
                 putOntoBattlefield(card, item.controller, fromSpell = true)
             } else {
                 item.effect?.let {
-                    resolveEffect(it, EffectContext(item.controller, null, item.sourceName, item.targets))
+                    resolveEffect(
+                        it,
+                        EffectContext(item.controller, null, item.sourceName, item.targets, item.xValue),
+                    )
                 }
                 if (card != null) {
                     val destination = state.stateOf(item.controller)
@@ -539,10 +562,22 @@ class Battle(
     }
 
     private fun runTrigger(source: Permanent, trigger: dev.deckbuild.core.model.Trigger) {
+        // Todes-Ausloeser koennen weitere Tode verursachen. Ohne Deckel liesse
+        // sich daraus eine Endlosschleife bauen, die das Spiel einfriert.
+        if (triggerDepth >= MAX_TRIGGER_DEPTH) {
+            say("Zu viele verkettete Ausloeser - ${source.def.name} wird uebersprungen.", important = true)
+            return
+        }
         val targets = if (trigger.targets.isEmpty()) emptyList() else autoTargets(trigger.targets, source.controller, source)
         if (trigger.targets.isNotEmpty() && targets.size < trigger.targets.count { !it.optional }) return
         if (trigger.text.isNotBlank()) say("${source.def.name}: ${trigger.text}", source.controller)
-        resolveEffect(trigger.effect, EffectContext(source.controller, source, source.def.name, targets))
+
+        triggerDepth++
+        try {
+            resolveEffect(trigger.effect, EffectContext(source.controller, source, source.def.name, targets))
+        } finally {
+            triggerDepth--
+        }
         checkState()
     }
 
@@ -768,6 +803,25 @@ class Battle(
         for (trigger in permanent.def.triggers.filter { it.event == TriggerEvent.STIRBT }) {
             runTrigger(permanent, trigger)
         }
+        if (permanent.def.type == CardType.KREATUR) fireDeathWatch(permanent)
+    }
+
+    /**
+     * Ausloeser anderer Permanenten auf den Tod einer Kreatur.
+     *
+     * Getrennt vom eigenen Stirbt-Ausloeser, weil hier das gestorbene Objekt
+     * gegen den Filter geprueft wird und nicht der Ausloeser selbst.
+     */
+    private fun fireDeathWatch(dead: Permanent) {
+        for (watcher in state.battlefield.toList()) {
+            if (watcher === dead) continue
+            if (watcher !in state.battlefield) continue
+            for (trigger in watcher.def.triggers.filter { it.event == TriggerEvent.ANDERE_KREATUR_STIRBT }) {
+                val filter = trigger.filter
+                if (filter != null && !state.matches(dead, filter, watcher)) continue
+                runTrigger(watcher, trigger)
+            }
+        }
     }
 
     /** Zustandsbasierte Aktionen: toedlicher Schaden und Lebenspunkte. */
@@ -939,6 +993,8 @@ class Battle(
         val source: Permanent?,
         val sourceName: String,
         val targets: List<TargetRef>,
+        /** Beim Wirken gewaehlter Wert von X; ausserhalb eines Zaubers 0. */
+        val xValue: Int = 0,
     )
 
     private fun resolveEffect(effect: Effect, ctx: EffectContext) {
@@ -1036,6 +1092,25 @@ class Battle(
                 }
                 if (permanents.isNotEmpty()) {
                     say("${ctx.sourceName} staerkt ${permanents.size} Kreatur(en).", ctx.controller)
+                }
+            }
+
+            is Effect.Marken -> {
+                val amount = evaluate(effect.amount, ctx)
+                if (amount != 0) {
+                    val (permanents, _) = resolveSelector(effect.target, ctx)
+                    for (permanent in permanents) {
+                        permanent.counterPower += amount
+                        permanent.counterToughness += amount
+                    }
+                    if (permanents.isNotEmpty()) {
+                        val wort = if (amount > 0) "erhaelt" else "verliert"
+                        say(
+                            "${ctx.sourceName}: ${permanents.size} Kreatur(en) $wort " +
+                                "${kotlin.math.abs(amount)} Marke(n).",
+                            ctx.controller,
+                        )
+                    }
                 }
             }
 
@@ -1156,6 +1231,12 @@ class Battle(
         is Value.Fixed -> value.amount
         is Value.Count -> selectWithViewpoint(value.filter, ctx).size
         is Value.Summe -> value.values.sumOf { evaluate(it, ctx) }
+        is Value.Negiert -> -evaluate(value.inner, ctx)
+        // Nur positive Marken zaehlen mit: Schwaechungsmarken sollen eine
+        // Marken-Zahlung nicht ins Negative ziehen.
+        is Value.Marken -> selectWithViewpoint(value.filter, ctx)
+            .sumOf { it.counterPower.coerceAtLeast(0) }
+        Value.X -> ctx.xValue
         Value.Friedhof -> state.stateOf(ctx.controller).graveyard.size
         Value.FehlendeLeben -> state.stateOf(ctx.controller).missingLife
         Value.ZauberDiesenZug -> state.stateOf(ctx.controller).spellsCastThisTurn
@@ -1192,9 +1273,20 @@ class Battle(
             if (side != state.activeSide) return false
             if (state.phase != Phase.HAUPT_1 && state.phase != Phase.HAUPT_2) return false
         }
-        if (def.targets.any { !it.optional } && legalTargets(def.targets.first(), side).isEmpty()) return false
-        return state.canPay(side, def.cost)
+        if (!state.canPay(side, def.cost)) return false
+
+        // Modale Karten sind spielbar, sobald ein einziger Modus Ziele findet.
+        val modeIndices = if (def.isModal) def.modes.indices.toList() else listOf(0)
+        return modeIndices.any { index -> hasLegalTargets(def.targetsFor(index), side) }
     }
+
+    /** Sind fuer alle Pflichtziele einer Vorgabe legale Ziele vorhanden? */
+    private fun hasLegalTargets(specs: List<TargetSpec>, side: Side): Boolean =
+        specs.none { !it.optional && legalTargets(it, side).isEmpty() }
+
+    /** Modi, die mit dem aktuellen Spielstand ueberhaupt sinnvoll waehlbar sind. */
+    fun castableModes(side: Side, def: CardDef): List<Int> =
+        if (!def.isModal) emptyList() else def.modes.indices.filter { hasLegalTargets(def.targetsFor(it), side) }
 
     fun canPlayFaceDownSource(side: Side): Boolean =
         state.ruleset.allowFaceDownSources &&
@@ -1208,5 +1300,8 @@ class Battle(
 
     companion object {
         const val TOKEN_KRISTALL = "tok_kristall"
+
+        /** Obergrenze verketteter Ausloeser, damit Todesketten terminieren. */
+        const val MAX_TRIGGER_DEPTH = 12
     }
 }

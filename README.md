@@ -26,7 +26,7 @@ zu, dann fällt Kampfschaden — mit einem eigenen Schritt für Vorstoß.
 Zehrung, Wächter, Verschleiert, Schild und Verbrauch.
 
 **Stämme.** Kreaturen tragen Typen — Krieger, Magier, Geist, Bestie, Untoter,
-Elementar, Konstrukt, Drache. Der Kartenpool umfasst 104 Spielkarten über fünf
+Elementar, Konstrukt, Drache. Der Kartenpool umfasst 119 Spielkarten über fünf
 Aspekte, von Ein-Essenz-Kreaturen bis zu Sieben-Essenz-Drachen. Anführer stärken ihren Stamm, Zahlungen zählen
 ihn („2 Schaden, plus 1 je eigenem Elementar"). Daneben gibt es eine
 Zauber-Achse: Karten, die auslösen, sobald man einen Zauber wirkt.
@@ -36,6 +36,12 @@ Karten mit dem Stamm markiert, für den sie gebaut sind. Sobald ein Deck drei
 Kreaturen eines Stammes enthält, werden passende Karten dreifach gewichtet
 angeboten — ein Deck verdichtet sich also über den Lauf hinweg, statt zufällig
 zu wachsen.
+
+**Variable Kosten und Wahlmöglichkeiten.** Karten mit X-Kosten legen ihre Höhe
+beim Wirken fest — „Fügt X Schaden zu" wird so zum Ressourcen-Entscheid. Modale
+Karten stellen zwei bis drei Wirkungen zur Wahl; welche Ziele gebraucht werden,
+entscheidet sich erst mit dem Modus. Stärkemarken sind dauerhaft und lassen sich
+zählen, und Auslöser reagieren auf den Tod anderer Kreaturen.
 
 **Verbrauch gibt es zweifach.** Karten mit dem Schlüsselwort *Verbrauch* werden
 nach dem Ausspielen verbannt statt abgelegt. Daneben trägt man bis zu drei
@@ -105,7 +111,7 @@ Mindest-SDK ist 26, Ziel-SDK 35.
 
 ## Tests
 
-Rund 100 Tests decken den Regelkern und den Spielablauf ab: Kostenberechnung,
+Rund 125 Tests decken den Regelkern und den Spielablauf ab: Kostenberechnung,
 Kampf mit allen Schlüsselwörtern, Zauber und Stapel, Stammes-Synergien,
 Laufsteuerung, Speicherstand und der komplette Bildschirmablauf einer Sitzung.
 
@@ -129,6 +135,5 @@ Sinnvolle Erweiterungen:
 - Freie Prioritätsfenster statt eines Antwortfensters pro Spielerzauber
 - Deckbau zwischen den Läufen und mehr Karten pro Aspekt
 - Kartenveredelung an Rastplätzen als zusätzliche Fortschrittsachse
-- Modale Karten, X-Kosten, Marken-Zahlungen und ein Opfer-Auslöser („wenn eine
-  andere Kreatur stirbt") — die vier Mechaniken, die das Effekt-Vokabular am
-  stärksten verbreitern
+- Mehrfachziele für einen einzelnen Effekt ("verteile X Schaden beliebig")
+- Karten, die auf die Bibliothek wirken (Ober-Karten ansehen, umordnen)

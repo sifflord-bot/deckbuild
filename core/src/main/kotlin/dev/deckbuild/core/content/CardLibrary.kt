@@ -12,6 +12,7 @@ import dev.deckbuild.core.model.Cost
 import dev.deckbuild.core.model.Effect
 import dev.deckbuild.core.model.Filter
 import dev.deckbuild.core.model.Keyword
+import dev.deckbuild.core.model.Mode
 import dev.deckbuild.core.model.Rarity
 import dev.deckbuild.core.model.Selector
 import dev.deckbuild.core.model.StaticAbility
@@ -397,6 +398,40 @@ object CardLibrary : CardResolver {
             flavor = "Aeltere Berge hat er schon einmal brennen sehen.",
             rarity = Rarity.SELTEN,
         ),
+        CardDef(
+            id = "glut_flammenflut",
+            name = "Flammenflut",
+            type = CardType.RITUAL,
+            aspect = Aspect.GLUT,
+            cost = Cost.variable(Aspect.GLUT, 1),
+            targets = listOf(zielBeliebig),
+            onResolve = Effect.Schaden(Selector.Chosen(0), Value.X),
+            rulesText = "Fuegt einem beliebigen Ziel X Schaden zu.",
+            flavor = "So viel, wie noch da ist.",
+        ),
+        CardDef(
+            id = "glut_zwiespalt",
+            name = "Zwiespalt",
+            type = CardType.SPONTAN,
+            aspect = Aspect.GLUT,
+            cost = Cost.colored(Aspect.GLUT, 1, generic = 1),
+            modes = listOf(
+                Mode(
+                    label = "3 Schaden auf eine Kreatur",
+                    effect = Effect.Schaden(Selector.Chosen(0), Value.of(3)),
+                    targets = listOf(zielKreatur),
+                ),
+                Mode(
+                    label = "2 Schaden am Gegner, ziehe eine Karte",
+                    effect = Effect.kette(
+                        Effect.Schaden(Selector.Feind, Value.of(2)),
+                        Effect.Ziehen(Selector.Du, Value.of(1)),
+                    ),
+                ),
+            ),
+            rulesText = "Waehle eins: 3 Schaden auf eine Kreatur; oder 2 Schaden am Gegner und ziehe eine Karte.",
+            rarity = Rarity.SELTEN,
+        ),
     )
 
     // ---------------------------------------------------------------- Flut
@@ -667,6 +702,16 @@ object CardLibrary : CardResolver {
             subtypes = setOf(Subtype.BESTIE),
             onResolve = Effect.Antappen(Selector.Alle(Filter.GEGNERISCHE_KREATUREN)),
             rulesText = "Betritt das Schlachtfeld: Tappe alle gegnerischen Kreaturen.",
+            rarity = Rarity.SELTEN,
+        ),
+        CardDef(
+            id = "flut_arkane_flut",
+            name = "Arkane Flut",
+            type = CardType.RITUAL,
+            aspect = Aspect.FLUT,
+            cost = Cost.variable(Aspect.FLUT, 1, generic = 1),
+            onResolve = Effect.Ziehen(Selector.Du, Value.X),
+            rulesText = "Ziehe X Karten.",
             rarity = Rarity.SELTEN,
         ),
     )
@@ -958,6 +1003,79 @@ object CardLibrary : CardResolver {
             rulesText = "Flug, Zehrung.",
             rarity = Rarity.SELTEN,
         ),
+        CardDef(
+            id = "asche_seelenzoll",
+            name = "Seelenzoll",
+            type = CardType.RITUAL,
+            aspect = Aspect.ASCHE,
+            cost = Cost.variable(Aspect.ASCHE, 1),
+            targets = listOf(zielGegnerKreatur),
+            onResolve = Effect.Marken(Selector.Chosen(0), Value.Negiert(Value.X)),
+            rulesText = "Eine gegnerische Kreatur erhaelt X dauerhafte -1/-1-Marken.",
+        ),
+        CardDef(
+            id = "asche_blutvogt",
+            name = "Blutvogt",
+            type = CardType.KREATUR,
+            aspect = Aspect.ASCHE,
+            cost = Cost.colored(Aspect.ASCHE, 1, generic = 2),
+            power = 2,
+            toughness = 2,
+            subtypes = setOf(Subtype.UNTOTER),
+            triggers = listOf(
+                Trigger(
+                    event = TriggerEvent.ANDERE_KREATUR_STIRBT,
+                    filter = Filter(types = setOf(CardType.KREATUR), controller = ControllerScope.EIGENE),
+                    effect = Effect.kette(
+                        Effect.Schaden(Selector.Feind, Value.of(1)),
+                        Effect.Heilung(Selector.Du, Value.of(1)),
+                    ),
+                    text = "zieht Nutzen aus dem Tod.",
+                ),
+            ),
+            rulesText = "Immer wenn eine andere eigene Kreatur stirbt, verliert der Gegner 1 Leben und du heilst 1.",
+            rarity = Rarity.SELTEN,
+        ),
+        CardDef(
+            id = "asche_seelensammler",
+            name = "Seelensammler",
+            type = CardType.KREATUR,
+            aspect = Aspect.ASCHE,
+            cost = Cost.colored(Aspect.ASCHE, 2, generic = 2),
+            power = 2,
+            toughness = 3,
+            subtypes = setOf(Subtype.UNTOTER),
+            triggers = listOf(
+                Trigger(
+                    event = TriggerEvent.ANDERE_KREATUR_STIRBT,
+                    filter = Filter(types = setOf(CardType.KREATUR), controller = ControllerScope.EIGENE),
+                    effect = Effect.Marken(Selector.Selbst, Value.of(1)),
+                    text = "waechst.",
+                ),
+            ),
+            rulesText = "Immer wenn eine andere eigene Kreatur stirbt, erhaelt er eine +1/+1-Marke.",
+            rarity = Rarity.SELTEN,
+        ),
+        CardDef(
+            id = "asche_grabwahl",
+            name = "Grabwahl",
+            type = CardType.RITUAL,
+            aspect = Aspect.ASCHE,
+            cost = Cost.colored(Aspect.ASCHE, 1, generic = 2),
+            modes = listOf(
+                Mode(
+                    label = "Kreatur bis Kosten 4 wiederbeleben",
+                    effect = Effect.Wiederbeleben(Selector.Du, maxCost = 4),
+                ),
+                Mode(
+                    label = "Der Gegner wirft zwei Karten ab",
+                    effect = Effect.Abwerfen(Selector.Feind, Value.of(2)),
+                ),
+            ),
+            rulesText = "Waehle eins: Belebe eine Kreatur mit Kosten bis 4 wieder; " +
+                "oder der Gegner wirft zwei Karten ab.",
+            rarity = Rarity.SELTEN,
+        ),
     )
 
     // ---------------------------------------------------------------- Hain
@@ -1209,6 +1327,64 @@ object CardLibrary : CardResolver {
             rulesText = "Trampeln.",
             rarity = Rarity.SELTEN,
         ),
+        CardDef(
+            id = "hain_urwuchs",
+            name = "Urwuchs",
+            type = CardType.RITUAL,
+            aspect = Aspect.HAIN,
+            cost = Cost.variable(Aspect.HAIN, 1),
+            targets = listOf(zielEigeneKreatur),
+            onResolve = Effect.Marken(Selector.Chosen(0), Value.X),
+            rulesText = "Eine eigene Kreatur erhaelt X dauerhafte +1/+1-Marken.",
+        ),
+        CardDef(
+            id = "hain_rankenhueter",
+            name = "Rankenhueter",
+            type = CardType.KREATUR,
+            aspect = Aspect.HAIN,
+            cost = Cost.colored(Aspect.HAIN, 1, generic = 2),
+            power = 1,
+            toughness = 1,
+            subtypes = setOf(Subtype.ELEMENTAR),
+            onResolve = Effect.Marken(Selector.Selbst, Value.of(2)),
+            rulesText = "Betritt das Schlachtfeld: Erhaelt zwei +1/+1-Marken.",
+        ),
+        CardDef(
+            id = "hain_wachstumsschub",
+            name = "Wachstumsschub",
+            type = CardType.RITUAL,
+            aspect = Aspect.HAIN,
+            cost = Cost.colored(Aspect.HAIN, 1, generic = 2),
+            onResolve = Effect.Marken(Selector.Alle(Filter.eigeneMitMarken()), Value.of(1)),
+            rulesText = "Jede eigene Kreatur mit einer Marke erhaelt eine weitere +1/+1-Marke.",
+            rarity = Rarity.SELTEN,
+        ),
+        CardDef(
+            id = "hain_wandel",
+            name = "Wandel des Hains",
+            type = CardType.RITUAL,
+            aspect = Aspect.HAIN,
+            archetypes = setOf(Subtype.BESTIE),
+            cost = Cost.colored(Aspect.HAIN, 1, generic = 2),
+            modes = listOf(
+                Mode(
+                    label = "Erschaffe einen Dickichtwolf",
+                    effect = Effect.Erschaffen(Selector.Du, "tok_wolf", Value.of(1)),
+                ),
+                Mode(
+                    label = "Zwei Marken auf eine eigene Kreatur",
+                    effect = Effect.Marken(Selector.Chosen(0), Value.of(2)),
+                    targets = listOf(zielEigeneKreatur),
+                ),
+                Mode(
+                    label = "Erhalte einen Essenzkristall",
+                    effect = Effect.Essenz(Selector.Du, 1, dauerhaft = true),
+                ),
+            ),
+            rulesText = "Waehle eins: Erschaffe einen 2/2 Dickichtwolf; oder lege zwei +1/+1-Marken auf eine " +
+                "eigene Kreatur; oder erschaffe einen Essenzkristall.",
+            rarity = Rarity.SELTEN,
+        ),
     )
 
     // --------------------------------------------------------------- Licht
@@ -1458,6 +1634,65 @@ object CardLibrary : CardResolver {
             rulesText = "Flug, Wacht.",
             rarity = Rarity.SELTEN,
         ),
+        CardDef(
+            id = "licht_aufmarsch",
+            name = "Aufmarsch",
+            type = CardType.RITUAL,
+            aspect = Aspect.LICHT,
+            archetypes = setOf(Subtype.GEIST),
+            cost = Cost.variable(Aspect.LICHT, 1, generic = 1),
+            onResolve = Effect.Erschaffen(Selector.Du, "tok_waechter", Value.X),
+            rulesText = "Erschaffe X 1/1 Schildgeister.",
+            rarity = Rarity.SELTEN,
+        ),
+        CardDef(
+            id = "licht_segensmal",
+            name = "Segensmal",
+            type = CardType.SPONTAN,
+            aspect = Aspect.LICHT,
+            cost = Cost.colored(Aspect.LICHT, 1, generic = 1),
+            onResolve = Effect.Staerken(
+                Selector.Alle(Filter.eigeneMitMarken()),
+                power = 1,
+                toughness = 1,
+                keywords = setOf(Keyword.WACHT),
+            ),
+            rulesText = "Eigene Kreaturen mit Marken erhalten +1/+1 und Wacht bis zum Zugende.",
+        ),
+        CardDef(
+            id = "licht_urteilsspruch",
+            name = "Urteilsspruch",
+            type = CardType.RITUAL,
+            aspect = Aspect.LICHT,
+            cost = Cost.colored(Aspect.LICHT, 1, generic = 2),
+            modes = listOf(
+                Mode(
+                    label = "Verbanne eine starke gegnerische Kreatur",
+                    effect = Effect.Verbannen(Selector.Chosen(0)),
+                    targets = listOf(
+                        TargetSpec(
+                            TargetKind.KREATUR,
+                            Filter(
+                                types = setOf(CardType.KREATUR),
+                                controller = ControllerScope.GEGNERISCHE,
+                                minPower = 3,
+                            ),
+                            prompt = "Gegnerische Kreatur mit Staerke 3 oder mehr",
+                        ),
+                    ),
+                ),
+                Mode(
+                    label = "Zwei Schildgeister und 4 Leben",
+                    effect = Effect.kette(
+                        Effect.Erschaffen(Selector.Du, "tok_waechter", Value.of(2)),
+                        Effect.Heilung(Selector.Du, Value.of(4)),
+                    ),
+                ),
+            ),
+            rulesText = "Waehle eins: Verbanne eine gegnerische Kreatur mit Staerke 3 oder mehr; " +
+                "oder erschaffe zwei 1/1 Schildgeister und heile 4 Leben.",
+            rarity = Rarity.SELTEN,
+        ),
     )
 
     // ------------------------------------------------------------- Neutral
@@ -1624,6 +1859,25 @@ object CardLibrary : CardResolver {
             subtypes = setOf(Subtype.KONSTRUKT),
             rulesText = "",
             flavor = "Gebaut, um zu bleiben.",
+        ),
+        CardDef(
+            id = "neutral_wegkreuzung",
+            name = "Wegkreuzung",
+            type = CardType.SPONTAN,
+            aspect = Aspect.NEUTRAL,
+            cost = Cost(generic = 2),
+            modes = listOf(
+                Mode(
+                    label = "Ziehe eine Karte",
+                    effect = Effect.Ziehen(Selector.Du, Value.of(1)),
+                ),
+                Mode(
+                    label = "Tappe eine gegnerische Kreatur",
+                    effect = Effect.Antappen(Selector.Chosen(0)),
+                    targets = listOf(zielGegnerKreatur),
+                ),
+            ),
+            rulesText = "Waehle eins: Ziehe eine Karte; oder tappe eine gegnerische Kreatur.",
         ),
     )
 

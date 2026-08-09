@@ -71,17 +71,29 @@ enum class Keyword(val label: String, val reminder: String) {
     VERBRAUCH("Verbrauch", "Wird nach dem Ausspielen verbannt statt abgelegt."),
 }
 
-/** Manakosten: farblose Menge plus konkrete Aspekt-Anforderungen. */
+/**
+ * Manakosten: farblose Menge plus konkrete Aspekt-Anforderungen.
+ *
+ * [hasX] markiert eine variable Zusatzmenge, die beim Wirken festgelegt wird.
+ * Die gewaehlte Zahl steht dem Effekt anschliessend als [Value.X] zur Verfuegung.
+ */
 data class Cost(
     val generic: Int = 0,
     val colored: Map<Aspect, Int> = emptyMap(),
+    val hasX: Boolean = false,
 ) {
+    /** Grundkosten ohne X. */
     val total: Int get() = generic + colored.values.sum()
 
-    val isFree: Boolean get() = total == 0
+    val isFree: Boolean get() = total == 0 && !hasX
+
+    /** Die tatsaechlich zu zahlenden Kosten bei gewaehltem [x]. */
+    fun withX(x: Int): Cost =
+        if (!hasX) this else Cost(generic + x.coerceAtLeast(0), colored, hasX = false)
 
     fun render(): String = buildString {
-        if (generic > 0 || colored.isEmpty()) append(generic)
+        if (hasX) append("X")
+        if (generic > 0 || (colored.isEmpty() && !hasX)) append(generic)
         for ((aspect, count) in colored.entries.sortedBy { it.key.ordinal }) {
             repeat(count) { append(aspect.short) }
         }
@@ -95,6 +107,10 @@ data class Cost(
 
         fun colored(aspect: Aspect, pips: Int, generic: Int = 0): Cost =
             Cost(generic, mapOf(aspect to pips))
+
+        /** Kosten der Form "X plus Grundbetrag". */
+        fun variable(aspect: Aspect, pips: Int, generic: Int = 0): Cost =
+            Cost(generic, mapOf(aspect to pips), hasX = true)
     }
 }
 
@@ -123,6 +139,8 @@ data class Filter(
     val controller: ControllerScope = ControllerScope.BELIEBIGE,
     val minPower: Int? = null,
     val maxPower: Int? = null,
+    /** Mindestzahl an Staerkemarken - Grundlage der Marken-Zahlungen. */
+    val minCounters: Int? = null,
     val tapped: Boolean? = null,
     val attacking: Boolean? = null,
     val excludeSelf: Boolean = false,
@@ -139,6 +157,13 @@ data class Filter(
             subtypes = setOf(subtype),
             controller = ControllerScope.EIGENE,
             excludeSelf = excludeSelf,
+        )
+
+        /** Eigene Kreaturen, die mindestens [anzahl] Staerkemarken tragen. */
+        fun eigeneMitMarken(anzahl: Int = 1) = Filter(
+            types = setOf(CardType.KREATUR),
+            controller = ControllerScope.EIGENE,
+            minCounters = anzahl,
         )
     }
 }
@@ -158,6 +183,15 @@ sealed interface Value {
 
     /** Zauber, die der Beherrscher in diesem Zug bereits gewirkt hat. */
     data object ZauberDiesenZug : Value
+
+    /** Der beim Wirken gewaehlte Wert von X; ausserhalb eines Zaubers null. */
+    data object X : Value
+
+    /** Summe der Staerkemarken auf allen passenden Permanenten. */
+    data class Marken(val filter: Filter) : Value
+
+    /** Kehrt das Vorzeichen um - fuer schwaechende Effekte mit variabler Hoehe. */
+    data class Negiert(val inner: Value) : Value
 
     /**
      * Summe mehrerer Werte. Erst damit lassen sich Zahlungen der Form
@@ -229,6 +263,12 @@ sealed interface Effect {
         val dauerhaft: Boolean = false,
     ) : Effect
 
+    /**
+     * Legt [amount] Staerkemarken auf die Ziele. Negative Werte schwaechen
+     * dauerhaft und koennen eine Kreatur toeten.
+     */
+    data class Marken(val target: Selector, val amount: Value) : Effect
+
     data class Erschaffen(val controller: Selector, val tokenId: String, val count: Value) : Effect
 
     /** Zusaetzliche Essenz; [dauerhaft] erhoeht die Quellenbasis (Ramp). */
@@ -266,9 +306,22 @@ data class TargetSpec(
     val prompt: String = "Ziel waehlen",
 )
 
+/**
+ * Eine Wahlmoeglichkeit einer modalen Karte ("Waehle eins").
+ *
+ * Jeder Modus bringt seine eigenen Zielvorgaben mit; welche gelten, entscheidet
+ * sich erst beim Wirken.
+ */
+data class Mode(
+    val label: String,
+    val effect: Effect,
+    val targets: List<TargetSpec> = emptyList(),
+)
+
 enum class TriggerEvent {
     BETRITT_SCHLACHTFELD,
     STIRBT,
+    ANDERE_KREATUR_STIRBT,
     GREIFT_AN,
     ANDERE_KREATUR_BETRITT,
     ZUG_BEGINN,
@@ -333,6 +386,8 @@ data class CardDef(
     val targets: List<TargetSpec> = emptyList(),
     /** Wirkung eines Zaubers bzw. Betritt-das-Schlachtfeld-Effekt eines Permanenten. */
     val onResolve: Effect? = null,
+    /** Ist die Liste nicht leer, ersetzt der gewaehlte Modus [onResolve] und [targets]. */
+    val modes: List<Mode> = emptyList(),
     val triggers: List<Trigger> = emptyList(),
     val activated: List<ActivatedAbility> = emptyList(),
     val statics: List<StaticAbility> = emptyList(),
@@ -350,6 +405,16 @@ data class CardDef(
 
     /** Alle Staemme, zu denen diese Karte einen Bezug hat. */
     val relatedSubtypes: Set<Subtype> get() = subtypes + archetypes
+
+    val isModal: Boolean get() = modes.isNotEmpty()
+
+    /** Zielvorgaben des gewaehlten Modus, sonst die der Karte selbst. */
+    fun targetsFor(modeIndex: Int): List<TargetSpec> =
+        if (modes.isEmpty()) targets else modes.getOrNull(modeIndex)?.targets.orEmpty()
+
+    /** Wirkung des gewaehlten Modus, sonst die der Karte selbst. */
+    fun effectFor(modeIndex: Int): Effect? =
+        if (modes.isEmpty()) onResolve else modes.getOrNull(modeIndex)?.effect
 
     /** Typzeile fuer die Kartenansicht, z. B. "Kreatur - Bestie". */
     val typeLine: String

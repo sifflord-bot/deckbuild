@@ -148,6 +148,10 @@ class StackItem(
     val sourcePermanent: Permanent?,
     val effect: dev.deckbuild.core.model.Effect?,
     val targets: List<TargetRef>,
+    /** Beim Wirken gewaehlter Wert von X. */
+    val xValue: Int = 0,
+    /** Gewaehlter Modus einer modalen Karte. */
+    val modeIndex: Int = 0,
 ) {
     var countered: Boolean = false
 }
@@ -302,6 +306,7 @@ class GameState(
         val basePower = permanent.def.power + permanent.counterPower + permanent.tempPower
         filter.minPower?.let { if (basePower < it) return false }
         filter.maxPower?.let { if (basePower > it) return false }
+        filter.minCounters?.let { if (permanent.counterPower < it) return false }
         filter.tapped?.let { if (permanent.tapped != it) return false }
         filter.attacking?.let { if (permanent.attacking != it) return false }
         return true
@@ -320,5 +325,20 @@ class GameState(
         stateOf(side).poolTotal() + essenceProducers(side).size
 
     /** Kann [cost] mit Pool und ungetappten Quellen bezahlt werden? */
-    fun canPay(side: Side, cost: Cost): Boolean = EssenceSolver.solve(this, side, cost) != null
+    fun canPay(side: Side, cost: Cost): Boolean =
+        EssenceSolver.solve(this, side, if (cost.hasX) cost.withX(0) else cost) != null
+
+    /**
+     * Groesstes X, das [side] fuer [cost] noch bezahlen kann. Liefert -1, wenn
+     * schon die Grundkosten nicht aufgehen.
+     */
+    fun maxAffordableX(side: Side, cost: Cost): Int {
+        if (!cost.hasX) return 0
+        val ceiling = availableEssence(side)
+        var best = -1
+        for (x in 0..ceiling) {
+            if (EssenceSolver.solve(this, side, cost.withX(x)) != null) best = x else break
+        }
+        return best
+    }
 }

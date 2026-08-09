@@ -13,6 +13,7 @@ import dev.deckbuild.core.meta.MetaService
 import dev.deckbuild.core.meta.SaveService
 import dev.deckbuild.core.model.CardType
 import dev.deckbuild.core.model.Keyword
+import dev.deckbuild.core.model.Mode
 import dev.deckbuild.core.model.Side
 import dev.deckbuild.core.model.TargetSpec
 import dev.deckbuild.core.run.EncounterFactory
@@ -45,13 +46,38 @@ sealed interface TargetingSource {
     data class Faehigkeit(val permanentId: Int, val index: Int) : TargetingSource
 }
 
+/** Welche Entscheidung als naechstes ansteht, bevor gewirkt werden kann. */
+enum class CastStage { MODUS, X_WERT, ZIEL, BEREIT }
+
+/**
+ * Eine Wirkung in Vorbereitung.
+ *
+ * Modale Karten und Karten mit variablen Kosten brauchen vor der Zielwahl
+ * weitere Entscheidungen. Statt drei getrennter Zustaende durchlaeuft alles
+ * dieselbe Abfolge; [stage] sagt der Oberflaeche, was sie gerade anzeigen soll.
+ */
 data class TargetingState(
     val source: TargetingSource,
-    val specs: List<TargetSpec>,
+    val specs: List<TargetSpec> = emptyList(),
     val chosen: List<TargetRef> = emptyList(),
+    val modes: List<Mode> = emptyList(),
+    val chosenMode: Int? = null,
+    /** -1 bedeutet: keine variablen Kosten. */
+    val maxX: Int = -1,
+    val chosenX: Int? = null,
+    val cardName: String = "",
 ) {
-    val currentSpec: TargetSpec? get() = specs.getOrNull(chosen.size)
-    val complete: Boolean get() = chosen.size >= specs.size
+    val stage: CastStage
+        get() = when {
+            modes.isNotEmpty() && chosenMode == null -> CastStage.MODUS
+            maxX >= 0 && chosenX == null -> CastStage.X_WERT
+            chosen.size < specs.size -> CastStage.ZIEL
+            else -> CastStage.BEREIT
+        }
+
+    val currentSpec: TargetSpec? get() = if (stage == CastStage.ZIEL) specs.getOrNull(chosen.size) else null
+
+    val complete: Boolean get() = stage == CastStage.BEREIT
 }
 
 /**
@@ -254,11 +280,63 @@ class GameSession(
             changed()
             return
         }
-        if (card.def.targets.isEmpty()) {
-            perform(GameAction.KarteSpielen(card.instanceId))
-        } else {
-            targeting = TargetingState(TargetingSource.Karte(card.instanceId), card.def.targets)
+
+        val def = card.def
+        targeting = TargetingState(
+            source = TargetingSource.Karte(card.instanceId),
+            specs = if (def.isModal) emptyList() else def.targets,
+            modes = def.modes,
+            maxX = if (def.cost.hasX) current.state.maxAffordableX(Side.SPIELER, def.cost) else -1,
+            cardName = def.name,
+        )
+        applyPending()
+    }
+
+    /** Modus einer modalen Karte waehlen. */
+    fun chooseMode(index: Int) {
+        val pending = targeting ?: return
+        if (pending.stage != CastStage.MODUS) return
+        val def = definitionOf(pending.source) ?: return
+        if (def.modes.getOrNull(index) == null) return
+        targeting = pending.copy(chosenMode = index, specs = def.targetsFor(index))
+        applyPending()
+    }
+
+    /** Wert von X festlegen. */
+    fun chooseX(value: Int) {
+        val pending = targeting ?: return
+        if (pending.stage != CastStage.X_WERT) return
+        targeting = pending.copy(chosenX = value.coerceIn(0, pending.maxX))
+        applyPending()
+    }
+
+    private fun definitionOf(source: TargetingSource) = when (source) {
+        is TargetingSource.Karte ->
+            battle?.state?.player?.hand?.firstOrNull { it.instanceId == source.instanceId }?.def
+        else -> null
+    }
+
+    /** Fuehrt die vorbereitete Wirkung aus, sobald keine Entscheidung mehr offen ist. */
+    private fun applyPending() {
+        val pending = targeting ?: return
+        if (!pending.complete) {
             changed()
+            return
+        }
+        targeting = null
+        when (val source = pending.source) {
+            is TargetingSource.Karte -> perform(
+                GameAction.KarteSpielen(
+                    instanceId = source.instanceId,
+                    targets = pending.chosen,
+                    x = pending.chosenX ?: 0,
+                    modeIndex = pending.chosenMode ?: 0,
+                ),
+            )
+            is TargetingSource.Gegenstand ->
+                perform(GameAction.GegenstandNutzen(source.slot, pending.chosen))
+            is TargetingSource.Faehigkeit ->
+                perform(GameAction.FaehigkeitAktivieren(source.permanentId, source.index, pending.chosen))
         }
     }
 
@@ -270,22 +348,22 @@ class GameSession(
             changed()
             return
         }
-        if (entry.def.targets.isEmpty()) {
-            perform(GameAction.GegenstandNutzen(slot))
-        } else {
-            targeting = TargetingState(TargetingSource.Gegenstand(slot), entry.def.targets)
-            changed()
-        }
+        targeting = TargetingState(
+            source = TargetingSource.Gegenstand(slot),
+            specs = entry.def.targets,
+            cardName = entry.def.name,
+        )
+        applyPending()
     }
 
     fun activateAbility(permanent: Permanent, index: Int) {
         val ability = permanent.def.activated.getOrNull(index) ?: return
-        if (ability.targets.isEmpty()) {
-            perform(GameAction.FaehigkeitAktivieren(permanent.instanceId, index))
-        } else {
-            targeting = TargetingState(TargetingSource.Faehigkeit(permanent.instanceId, index), ability.targets)
-            changed()
-        }
+        targeting = TargetingState(
+            source = TargetingSource.Faehigkeit(permanent.instanceId, index),
+            specs = ability.targets,
+            cardName = permanent.def.name,
+        )
+        applyPending()
     }
 
     fun cancelTargeting() {
@@ -300,21 +378,11 @@ class GameSession(
     }
 
     private fun addTarget(ref: TargetRef) {
-        val state = targeting ?: return
+        val pending = targeting ?: return
+        if (pending.stage != CastStage.ZIEL) return
         if (!isLegalTargetNow(ref)) return
-        val updated = state.copy(chosen = state.chosen + ref)
-        if (!updated.complete) {
-            targeting = updated
-            changed()
-            return
-        }
-        targeting = null
-        when (val source = updated.source) {
-            is TargetingSource.Karte -> perform(GameAction.KarteSpielen(source.instanceId, updated.chosen))
-            is TargetingSource.Gegenstand -> perform(GameAction.GegenstandNutzen(source.slot, updated.chosen))
-            is TargetingSource.Faehigkeit ->
-                perform(GameAction.FaehigkeitAktivieren(source.permanentId, source.index, updated.chosen))
-        }
+        targeting = pending.copy(chosen = pending.chosen + ref)
+        applyPending()
     }
 
     fun tapPlayer(side: Side) {

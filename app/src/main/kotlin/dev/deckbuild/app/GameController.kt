@@ -75,6 +75,10 @@ class GameController(save: SaveService) {
 
     fun cancelTargeting() = session.cancelTargeting()
 
+    fun chooseMode(index: Int) = session.chooseMode(index)
+
+    fun chooseX(value: Int) = session.chooseX(value)
+
     fun isLegalTargetNow(ref: TargetRef): Boolean = revisionState.let { session.isLegalTargetNow(ref) }
 
     fun tapPlayer(side: Side) = session.tapPlayer(side)
