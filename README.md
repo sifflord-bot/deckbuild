@@ -26,7 +26,8 @@ zu, dann fällt Kampfschaden — mit einem eigenen Schritt für Vorstoß.
 Zehrung, Wächter, Verschleiert, Schild und Verbrauch.
 
 **Stämme.** Kreaturen tragen Typen — Krieger, Magier, Geist, Bestie, Untoter,
-Elementar, Konstrukt, Drache. Anführer stärken ihren Stamm, Zahlungen zählen
+Elementar, Konstrukt, Drache. Der Kartenpool umfasst 104 Spielkarten über fünf
+Aspekte, von Ein-Essenz-Kreaturen bis zu Sieben-Essenz-Drachen. Anführer stärken ihren Stamm, Zahlungen zählen
 ihn („2 Schaden, plus 1 je eigenem Elementar"). Daneben gibt es eine
 Zauber-Achse: Karten, die auslösen, sobald man einen Zauber wirkt.
 
@@ -104,7 +105,7 @@ Mindest-SDK ist 26, Ziel-SDK 35.
 
 ## Tests
 
-Rund 88 Tests decken den Regelkern und den Spielablauf ab: Kostenberechnung,
+Rund 100 Tests decken den Regelkern und den Spielablauf ab: Kostenberechnung,
 Kampf mit allen Schlüsselwörtern, Zauber und Stapel, Stammes-Synergien,
 Laufsteuerung, Speicherstand und der komplette Bildschirmablauf einer Sitzung.
 

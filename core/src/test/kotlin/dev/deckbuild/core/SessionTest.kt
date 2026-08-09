@@ -244,7 +244,12 @@ class SessionTest {
 
         // Eine klar lohnende Angriffssituation herstellen, damit die KI angreift.
         battle.place(testCreature("Schlaechter", 6, 6), Side.GEGNER)
-        val blocker = battle.place(testCreature("Wache", 2, 8), Side.SPIELER)
+        // Flug, damit der Blocker jeden Angreifer abfangen darf - der Test prueft
+        // die Zuweisung, nicht die Blockbarkeit.
+        val blocker = battle.place(
+            testCreature("Wache", 2, 8, setOf(dev.deckbuild.core.model.Keyword.FLUG)),
+            Side.SPIELER,
+        )
 
         var guard = 0
         while (battle.awaiting != Awaiting.SPIELER_BLOCK && !battle.state.isOver && guard++ < 12) {
@@ -252,6 +257,9 @@ class SessionTest {
         }
         assertEquals(Awaiting.SPIELER_BLOCK, battle.awaiting, "Die KI greift nicht an")
 
+        // Der Gegner kann den Blocker unterwegs getappt haben; hier geht es um
+        // die Auswahllogik, also wird er wieder bereitgestellt.
+        blocker.tapped = false
         val attacker = battle.pendingAttackers.first()
         session.tapPermanent(blocker)
         assertEquals(blocker.instanceId, session.selectedBlocker)
@@ -276,7 +284,10 @@ class SessionTest {
         val battle = session.battle!!
 
         battle.place(testCreature("Schlaechter", 6, 6), Side.GEGNER)
-        val blocker = battle.place(testCreature("Wache", 2, 8), Side.SPIELER)
+        val blocker = battle.place(
+            testCreature("Wache", 2, 8, setOf(dev.deckbuild.core.model.Keyword.FLUG)),
+            Side.SPIELER,
+        )
 
         var guard = 0
         while (battle.awaiting != Awaiting.SPIELER_BLOCK && !battle.state.isOver && guard++ < 12) {
@@ -284,6 +295,7 @@ class SessionTest {
         }
         if (battle.awaiting != Awaiting.SPIELER_BLOCK) return
 
+        blocker.tapped = false
         val attacker = battle.pendingAttackers.first()
         session.tapPermanent(blocker)
         session.tapPermanent(attacker)

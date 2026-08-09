@@ -279,10 +279,18 @@ object RunManager {
 
     // ------------------------------------------------------------- Rastplatz
 
-    fun restHeal(run: RunState): RunState {
-        val healed = (run.life + (run.maxLife * 0.35).toInt()).coerceAtMost(run.maxLife)
-        return run.copy(life = healed)
-    }
+    /**
+     * Heilung bis zum Maximum - aber niemals nach unten.
+     *
+     * Kaempfe koennen ueber das Maximum hinaus heilen (Zehrung, Heilrelikte),
+     * und dieser Ueberschuss soll erhalten bleiben. Ein hartes Kappen auf
+     * [RunState.maxLife] wuerde einen Rastplatz sonst zur Strafe machen.
+     */
+    private fun healedLife(run: RunState, amount: Int): Int =
+        (run.life + amount).coerceAtMost(maxOf(run.maxLife, run.life))
+
+    fun restHeal(run: RunState): RunState =
+        run.copy(life = healedLife(run, (run.maxLife * 0.35).toInt()))
 
     /** Ladungen aller Verbrauchsgegenstaende auffuellen. */
     fun restRefill(run: RunState): RunState =
@@ -356,7 +364,7 @@ object RunManager {
         return when (offer.kind) {
             ShopKind.KARTE -> paid.copy(deck = paid.deck + offer.id)
             ShopKind.GEGENSTAND -> paid.copy(pouch = addConsumable(paid.pouch, offer.id))
-            ShopKind.HEILUNG -> paid.copy(life = (paid.life + 12).coerceAtMost(paid.maxLife))
+            ShopKind.HEILUNG -> paid.copy(life = healedLife(paid, 12))
             ShopKind.ENTFERNEN -> {
                 if (cardIdToRemove == null) run else removeCard(paid, cardIdToRemove)
             }
@@ -370,7 +378,7 @@ object RunManager {
         val rng = rngFor(run, salt = 5)
         return when (eventId) {
             "ev_schrein" -> if (choiceIndex == 0) {
-                run.copy(life = (run.life + 10).coerceAtMost(run.maxLife)) to "Du rastest am Schrein und heilst 10 Leben."
+                run.copy(life = healedLife(run, 10)) to "Du rastest am Schrein und heilst 10 Leben."
             } else {
                 run.copy(gold = run.gold + 45) to "Du nimmst die Gaben an dich: 45 Gold."
             }
@@ -394,7 +402,7 @@ object RunManager {
                 run.copy(pouch = addConsumable(run.pouch, item.id)) to "Du findest: ${item.name}."
             } else {
                 run.copy(
-                    life = (run.life + 6).coerceAtMost(run.maxLife),
+                    life = healedLife(run, 6),
                     gold = run.gold + 20,
                 ) to "Du ehrst die Toten: 6 Leben und 20 Gold."
             }
