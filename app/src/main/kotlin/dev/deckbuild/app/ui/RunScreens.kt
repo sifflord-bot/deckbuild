@@ -33,6 +33,7 @@ import dev.deckbuild.core.content.CardLibrary
 import dev.deckbuild.core.content.ConsumableLibrary
 import dev.deckbuild.core.run.Events
 import dev.deckbuild.core.run.NodeType
+import dev.deckbuild.core.run.RunManager
 import dev.deckbuild.core.run.RunState
 import dev.deckbuild.core.run.ShopKind
 
@@ -93,6 +94,11 @@ fun RunHeader(runState: RunState, controller: GameController) {
             StatChip("Leben", "${runState.life}/${runState.maxLife}", Palette.Health)
             StatChip("Gold", runState.gold.toString(), Palette.Gold)
             StatChip("Deck", runState.deckSize.toString(), Palette.Essence)
+            // Erreichbare Aspekte: Sie bestimmen, welche Karten ueberhaupt
+            // angeboten werden, also gehoeren sie sichtbar in die Kopfzeile.
+            for (aspect in RunManager.coloredAspects(runState)) {
+                StatChip(aspect.short, aspect.label, colorsFor(aspect).glow)
+            }
         }
         Spacer(Modifier.height(6.dp))
         Meter(runState.life.toFloat() / runState.maxLife.coerceAtLeast(1), Palette.Health)
@@ -260,8 +266,14 @@ fun ShopScreen(controller: GameController) {
                             ShopKind.GEGENSTAND -> "⚗"
                             ShopKind.ENTFERNEN -> "✂"
                             ShopKind.HEILUNG -> "♥"
+                            ShopKind.QUELLE -> "◉"
+                            ShopKind.ASPEKT -> "✧"
                         },
-                        accent = if (affordable) Palette.Gold else Palette.Outline,
+                        accent = when {
+                            !affordable -> Palette.Outline
+                            offer.kind == ShopKind.ASPEKT -> Palette.Essence
+                            else -> Palette.Gold
+                        },
                         enabled = affordable,
                     ) {
                         if (offer.kind == ShopKind.ENTFERNEN) removalPick = true else controller.buy(offer)

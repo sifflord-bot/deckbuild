@@ -1,5 +1,6 @@
 package dev.deckbuild.core.run
 
+import dev.deckbuild.core.model.Aspect
 import kotlinx.serialization.Serializable
 
 enum class NodeType(val label: String, val icon: String) {
@@ -37,7 +38,18 @@ data class ShopOffer(
 )
 
 @Serializable
-enum class ShopKind { KARTE, GEGENSTAND, ENTFERNEN, HEILUNG }
+enum class ShopKind {
+    KARTE,
+    GEGENSTAND,
+    ENTFERNEN,
+    HEILUNG,
+
+    /** Zusaetzliche Quellen eines bereits erreichbaren Aspekts. */
+    QUELLE,
+
+    /** Erschliesst einen zweiten Aspekt samt Quellen. */
+    ASPEKT,
+}
 
 /** Der komplette Zustand eines laufenden Durchgangs. */
 @Serializable
@@ -48,6 +60,15 @@ data class RunState(
     val life: Int,
     val maxLife: Int,
     val deck: List<String> = emptyList(),
+    /**
+     * Farbige Aspekte, deren Karten dieser Lauf spielen kann.
+     *
+     * Belohnungen und Haendlerangebote beschraenken sich darauf: Eine Karte,
+     * fuer die im Deck keine Quellen liegen, waere keine Wahl, sondern nur eine
+     * verschenkte Zeile. Leer bedeutet "noch nicht gesetzt" und faellt auf den
+     * Aspekt des Pfades zurueck, damit aeltere Spielstaende weiterlaufen.
+     */
+    val aspects: Set<Aspect> = emptySet(),
     val pouch: List<PouchEntry> = emptyList(),
     val gold: Int = 0,
     val defeatedEnemies: List<String> = emptyList(),

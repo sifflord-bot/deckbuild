@@ -44,6 +44,19 @@ object Events {
             ),
         ),
         EventDef(
+            id = "ev_lehre",
+            title = "Fremde Lehre",
+            text = "Am Feuer sitzt jemand, der einen anderen Aspekt beherrscht als du. " +
+                "Er ist bereit, dir die Grundlagen zu zeigen - lernen musst du selbst, und das kostet Kraft.",
+            choices = listOf(
+                EventChoice(
+                    "Die Lehre annehmen",
+                    "Verliere 6 Leben. Ein zweiter Aspekt wird geoeffnet, samt Quellen dafuer.",
+                ),
+                EventChoice("Bei deinem Weg bleiben", "Erhalte 40 Gold."),
+            ),
+        ),
+        EventDef(
             id = "ev_wanderer",
             title = "Schweigsamer Wanderer",
             text = "Er sieht dein Deck an, nickt langsam und deutet auf eine Karte darin.",

@@ -32,6 +32,25 @@ object RunManager {
 
     // ------------------------------------------------------------ Lauf starten
 
+    const val SPLASH_SOURCE_COUNT = 4
+    private const val EXTRA_SOURCE_COUNT = 3
+
+    /**
+     * Obergrenze farbiger Aspekte je Lauf.
+     *
+     * Bei drei Farben reicht die Quellenzahl nicht mehr, um verlaesslich die
+     * richtige Farbe zu ziehen; das Deck wuerde sich selbst blockieren.
+     */
+    const val MAX_ASPECTS = 2
+
+    /** Aspekte, die dieser Lauf noch dazulernen kann. */
+    fun learnableAspects(run: RunState): List<Aspect> =
+        if (coloredAspects(run).size >= MAX_ASPECTS) {
+            emptyList()
+        } else {
+            Aspect.entries.filter { it.isColored && it !in coloredAspects(run) }
+        }
+
     fun startRun(pathId: String, seed: Long): RunState {
         val path = StarterDecks.require(pathId)
         val base = RunState(
@@ -41,9 +60,38 @@ object RunManager {
             life = path.startingLife,
             maxLife = path.startingLife,
             deck = StarterDecks.deckList(path),
+            aspects = setOf(path.aspect),
             pouch = path.startingConsumables.map { PouchEntry(it, ConsumableLibrary.require(it).maxCharges) },
         )
         return base.copy(nodes = rollNodes(base))
+    }
+
+    /**
+     * Farbige Aspekte, deren Karten der Lauf tatsaechlich wirken kann.
+     *
+     * Aeltere Spielstaende kennen das Feld noch nicht; dann gilt der Aspekt des
+     * gewaehlten Pfades.
+     */
+    fun coloredAspects(run: RunState): Set<Aspect> =
+        run.aspects.ifEmpty { setOfNotNull(StarterDecks.find(run.pathId)?.aspect) }
+
+    /** Der Grundaspekt des Pfades - er bleibt gegenueber einem Zweitaspekt bevorzugt. */
+    private fun primaryAspect(run: RunState): Aspect =
+        StarterDecks.find(run.pathId)?.aspect ?: coloredAspects(run).firstOrNull() ?: Aspect.NEUTRAL
+
+    /** Kann diese Karte im Lauf ueberhaupt gewirkt werden? */
+    fun isPlayable(run: RunState, card: CardDef): Boolean =
+        card.aspect == Aspect.NEUTRAL || card.aspect in coloredAspects(run)
+
+    /** Fuegt einen Aspekt hinzu und legt passende Quellen ins Deck. */
+    fun addAspect(run: RunState, aspect: Aspect, sources: Int = SPLASH_SOURCE_COUNT): RunState {
+        if (aspect == Aspect.NEUTRAL || aspect in coloredAspects(run)) return run
+        if (coloredAspects(run).size >= MAX_ASPECTS) return run
+        val sourceId = CardLibrary.QUELLEN.getValue(aspect).id
+        return run.copy(
+            aspects = coloredAspects(run) + aspect,
+            deck = run.deck + List(sources) { sourceId },
+        )
     }
 
     private fun rngFor(run: RunState, salt: Int = 0): Rng =
@@ -189,8 +237,11 @@ object RunManager {
         rng: Rng,
         boss: Boolean,
     ): List<String> {
-        val pathAspect = StarterDecks.find(run.pathId)?.aspect ?: Aspect.NEUTRAL
-        val pool = CardLibrary.spells.filter { meta.isCardUnlocked(it.id) && it.type != CardType.QUELLE }
+        val pathAspect = primaryAspect(run)
+        // Nur Karten anbieten, fuer die im Deck auch Quellen liegen koennen.
+        val pool = CardLibrary.spells.filter {
+            meta.isCardUnlocked(it.id) && it.type != CardType.QUELLE && isPlayable(run, it)
+        }
         if (pool.isEmpty()) return emptyList()
 
         val synergy = synergyTribes(run)
@@ -226,10 +277,12 @@ object RunManager {
         boss: Boolean,
         synergy: Set<Subtype> = emptySet(),
     ): Int {
+        // Der Pool ist bereits auf spielbare Aspekte gefiltert; hier geht es nur
+        // noch darum, den Grundaspekt gegenueber einem Zweitaspekt zu bevorzugen.
         val aspectFactor = when (card.aspect) {
             pathAspect -> 6
             Aspect.NEUTRAL -> 3
-            else -> 2
+            else -> 4
         }
         val rarityFactor = when (card.rarity) {
             Rarity.HAEUFIG -> if (boss) 2 else 6
@@ -311,11 +364,11 @@ object RunManager {
 
     private fun rollShop(run: RunState): List<ShopOffer> {
         val rng = rngFor(run, salt = 4)
-        val pathAspect = StarterDecks.find(run.pathId)?.aspect ?: Aspect.NEUTRAL
+        val pathAspect = primaryAspect(run)
         val offers = mutableListOf<ShopOffer>()
 
         val synergy = synergyTribes(run)
-        val cardPool = CardLibrary.spells.filter { it.type != CardType.QUELLE }
+        val cardPool = CardLibrary.spells.filter { it.type != CardType.QUELLE && isPlayable(run, it) }
         repeat(3) {
             val card = rng.weighted(cardPool) {
                 weightFor(it, pathAspect, run.tier, boss = false, synergy = synergy)
@@ -338,6 +391,31 @@ object RunManager {
                 Rarity.LEGENDAER -> 50
             }
             offers += ShopOffer(ShopKind.GEGENSTAND, item.id, price, item.name, item.text)
+        }
+
+        // Quellen zu kaufen war bisher unmoeglich - damit liess sich ein
+        // Zweitaspekt nie erschliessen und die Manabasis nie nachbessern.
+        val quellenAspekt = rng.pick(coloredAspects(run).toList().ifEmpty { listOf(pathAspect) })
+        offers += ShopOffer(
+            ShopKind.QUELLE,
+            quellenAspekt.name,
+            30,
+            "$EXTRA_SOURCE_COUNT Quellen (${quellenAspekt.label})",
+            "Legt $EXTRA_SOURCE_COUNT ${CardLibrary.QUELLEN.getValue(quellenAspekt).name} in dein Deck.",
+        )
+
+        val lernbar = learnableAspects(run)
+        if (lernbar.isNotEmpty()) {
+            rng.pickOrNull(lernbar)?.let { neuerAspekt ->
+                offers += ShopOffer(
+                    ShopKind.ASPEKT,
+                    neuerAspekt.name,
+                    110,
+                    "Zweiter Aspekt: ${neuerAspekt.label}",
+                    "Oeffnet ${neuerAspekt.label} fuer kuenftige Belohnungen und legt " +
+                        "$SPLASH_SOURCE_COUNT passende Quellen in dein Deck.",
+                )
+            }
         }
 
         offers += ShopOffer(
@@ -368,8 +446,20 @@ object RunManager {
             ShopKind.ENTFERNEN -> {
                 if (cardIdToRemove == null) run else removeCard(paid, cardIdToRemove)
             }
+            ShopKind.QUELLE -> {
+                val aspect = aspectFromId(offer.id) ?: return run
+                val sourceId = CardLibrary.QUELLEN.getValue(aspect).id
+                paid.copy(deck = paid.deck + List(EXTRA_SOURCE_COUNT) { sourceId })
+            }
+            ShopKind.ASPEKT -> {
+                val aspect = aspectFromId(offer.id) ?: return run
+                addAspect(paid, aspect)
+            }
         }
     }
+
+    private fun aspectFromId(id: String): Aspect? =
+        Aspect.entries.firstOrNull { it.name == id }?.takeIf { it.isColored }
 
     // ------------------------------------------------------------- Ereignisse
 
@@ -395,6 +485,22 @@ object RunManager {
                 }
             } else {
                 run to "Du gehst weiter. Die Stimme laesst dich ziehen."
+            }
+
+            "ev_lehre" -> if (choiceIndex == 0) {
+                val neuer = rng.pickOrNull(learnableAspects(run))
+                if (neuer == null) {
+                    // Wer schon zwei Aspekte fuehrt, hat hier nichts mehr zu lernen.
+                    run.copy(gold = run.gold + 40) to
+                        "Du beherrschst bereits mehrere Aspekte. Er gibt dir stattdessen 40 Gold."
+                } else {
+                    val gelernt = addAspect(run.copy(life = (run.life - 6).coerceAtLeast(1)), neuer)
+                    gelernt to
+                        "Du lernst den Aspekt ${neuer.label}. " +
+                        "$SPLASH_SOURCE_COUNT Quellen wandern in dein Deck."
+                }
+            } else {
+                run.copy(gold = run.gold + 40) to "Du bleibst bei deinem Weg: 40 Gold."
             }
 
             "ev_kampfplatz" -> if (choiceIndex == 0) {

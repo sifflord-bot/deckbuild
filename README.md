@@ -50,6 +50,13 @@ Blockschritt und laden sich an Rastplätzen wieder auf.
 
 ## Lauf und Fortschritt
 
+**Aspekte eines Laufs.** Ein Lauf beginnt einfarbig, und Belohnungen bieten nur
+Karten an, für die im Deck auch Quellen liegen können — eine unspielbare Karte
+wäre keine Wahl, sondern eine verschenkte Zeile. Über den Händler oder die
+Begegnung „Fremde Lehre" lässt sich ein zweiter Aspekt erschließen; er bringt
+eigene Quellen mit und öffnet seine Karten für künftige Belohnungen. Bei zwei
+Aspekten ist Schluss: Bei drei Farben zieht man zu selten die richtige.
+
 Ein Lauf ist eine endlose Folge von Stufen. Jede Stufe bietet zwei bis drei
 Stationen zur Wahl — Gefecht, Elitegegner, Rastplatz, Händler, Fundstelle oder
 eine Textbegegnung. Jede fünfte Stufe ist ein Boss. Nach jedem Sieg wählt man eine
@@ -111,7 +118,7 @@ Mindest-SDK ist 26, Ziel-SDK 35.
 
 ## Tests
 
-Rund 125 Tests decken den Regelkern und den Spielablauf ab: Kostenberechnung,
+Rund 139 Tests decken den Regelkern und den Spielablauf ab: Kostenberechnung,
 Kampf mit allen Schlüsselwörtern, Zauber und Stapel, Stammes-Synergien,
 Laufsteuerung, Speicherstand und der komplette Bildschirmablauf einer Sitzung.
 
