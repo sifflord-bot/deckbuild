@@ -107,6 +107,24 @@ Erster sinnvoller Schritt lokal:
 ./gradlew :app:assembleDebug  # hier ist mit Fehlern zu rechnen
 ```
 
+## Offene Balancing-Fragen
+
+Diese Zahlen sind gesetzt, aber nie am echten Spiel geprüft — nur über
+`SimulationTest`, und der misst Gewinnraten, nicht Spielgefühl:
+
+- **110 Gold für den zweiten Aspekt** beim Händler. Reine Schätzung gegen ein
+  Einkommen von ungefähr 25 bis 40 Gold pro Kampf.
+- **6 Lebenspunkte** als Preis der Begegnung „Fremde Lehre".
+- **Vier Quellen** für einen Zweitaspekt (`RunManager.SPLASH_SOURCE_COUNT`).
+  Zu wenige machen die zweite Farbe unzuverlässig, zu viele verwässern das Deck.
+- **35 Prozent Heilung** am Rastplatz, gemessen an den maximalen Lebenspunkten.
+- **Gegnerskalierung**: Lebenspunkte plus 5 je Stufe, zusätzliche Startquellen ab
+  Stufe 9. Die Simulation zeigt, dass Stufe 19 schwerer ist als Stufe 1 — mehr
+  nicht.
+
+Wer hier dreht, sollte danach `SimulationTest` laufen lassen; die Prüfungen auf
+Gewinnrate und Skalierung fangen grobe Ausreißer ab.
+
 ## Nächste Schritte
 
 - `:app` zum Bauen bringen und auf einem Gerät starten
