@@ -180,7 +180,7 @@ object Enemies {
             aspects = listOf(Aspect.ASCHE),
             kind = EncounterKind.BOSS,
             minTier = 0,
-            baseLife = 48,
+            baseLife = 38,
             skill = BrainSkill.SCHLAU,
             signature = listOf("asche_fuerst", "asche_verderbnis", "asche_gierschlund", "asche_wiedergaenger"),
             unlocks = listOf("asche_fuerst"),
@@ -192,7 +192,7 @@ object Enemies {
             aspects = listOf(Aspect.FLUT),
             kind = EncounterKind.BOSS,
             minTier = 1,
-            baseLife = 46,
+            baseLife = 36,
             skill = BrainSkill.SCHLAU,
             signature = listOf("flut_sturmherrin", "flut_bannwelle", "flut_zeitriss", "flut_spiegelrochen"),
             unlocks = listOf("flut_sturmherrin"),
@@ -292,8 +292,8 @@ object Enemies {
 
         val life = def.baseLife + tier * 5 + when (def.kind) {
             EncounterKind.NORMAL -> 0
-            EncounterKind.ELITE -> 4
-            EncounterKind.BOSS -> 8
+            EncounterKind.ELITE -> 2
+            EncounterKind.BOSS -> 4
         }
 
         val startingSources = when {
@@ -303,7 +303,13 @@ object Enemies {
             else -> 0
         } + if (def.kind == EncounterKind.BOSS && tier >= 2) 1 else 0
 
-        val skill = if (tier >= 4 && def.skill == BrainSkill.EINFACH) BrainSkill.NORMAL else def.skill
+        val skill = when {
+            tier >= 4 && def.skill == BrainSkill.EINFACH -> BrainSkill.NORMAL
+            // Der erste Boss trifft ein Deck, das kaum ueber den Start hinaus
+            // gewachsen ist - volle SCHLAU-Staerke waere hier unfair frueh.
+            tier <= 1 && def.kind == EncounterKind.BOSS && def.skill == BrainSkill.SCHLAU -> BrainSkill.NORMAL
+            else -> def.skill
+        }
         val name = if (tier >= 5) "${def.name} (Stufe $tier)" else def.name
 
         return EnemyBuild(
