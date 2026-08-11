@@ -136,7 +136,7 @@ object CardLibrary : CardResolver {
             aspect = Aspect.GLUT,
             cost = Cost.colored(Aspect.GLUT, 1),
             power = 2,
-            toughness = 1,
+            toughness = 2,
             subtypes = setOf(Subtype.ELEMENTAR),
             keywords = setOf(Keyword.FLINK),
             rulesText = "Flink.",
@@ -149,7 +149,7 @@ object CardLibrary : CardResolver {
             aspect = Aspect.GLUT,
             cost = Cost.colored(Aspect.GLUT, 1, generic = 1),
             power = 3,
-            toughness = 1,
+            toughness = 2,
             subtypes = setOf(Subtype.KRIEGER),
         ),
         CardDef(
