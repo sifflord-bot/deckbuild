@@ -109,21 +109,49 @@ Erster sinnvoller Schritt lokal:
 
 ## Offene Balancing-Fragen
 
-Diese Zahlen sind gesetzt, aber nie am echten Spiel geprüft — nur über
-`SimulationTest`, und der misst Gewinnraten, nicht Spielgefühl:
+Diese Zahlen wurden inzwischen an einer vollständigen Lauf-Simulation geprüft
+(Stationswahl, Kämpfe, Belohnungen, Händlerkäufe, Rast — nicht nur isolierte
+Gefechte). Ergebnis für die fünf Pfade: Alle Pfade lagen anfangs zwischen 3.6
+und 7.9 mittlerer erreichter Stufe; nach mehreren gezielten Kartenänderungen
+liegen sie jetzt bei 4.8 bis 6.6 (Standardabweichung der Pfad-Mittelwerte nur
+noch 0.77). Die Hauptursache war ein scharfer Schwierigkeitssprung beim ersten
+Boss (Stufe 5), nicht die unten genannten Wirtschaftszahlen — siehe Commits
+"Erste Boss-Begegnung entschärft", "Pfad der Flut: neue Karte Wellenreiter"
+und "Glut und Hain: erste Boss-Begegnung deutlich entschärft".
 
-- **110 Gold für den zweiten Aspekt** beim Händler. Reine Schätzung gegen ein
-  Einkommen von ungefähr 25 bis 40 Gold pro Kampf.
-- **6 Lebenspunkte** als Preis der Begegnung „Fremde Lehre".
+Die folgenden Wirtschaftszahlen wurden einzeln mit A/B-Vergleichen in der
+vollständigen Lauf-Simulation geprüft (n=25 Läufe je Variante) und zeigten
+**keinen messbaren Effekt** auf die erreichte Stufe — sie sind also vermutlich
+nicht der Hebel, an dem sich noch etwas drehen lässt:
+
+- **110 Gold für den zweiten Aspekt** beim Händler. Test mit 90 Gold zeigte
+  fast identische Kaufquote (12–28 % der Läufe, meist um Stufe 6–7) und keine
+  Verbesserung. Die Begrenzung liegt eher an der zufälligen Verfügbarkeit des
+  Angebots im Shop als am Preis. Unverändert gelassen.
+- **35 Prozent Heilung** am Rastplatz. Test mit 45 % ergab praktisch identische
+  mittlere Stufe (5.74 vs. 5.81 über alle Pfade). Unverändert gelassen.
 - **Vier Quellen** für einen Zweitaspekt (`RunManager.SPLASH_SOURCE_COUNT`).
-  Zu wenige machen die zweite Farbe unzuverlässig, zu viele verwässern das Deck.
-- **35 Prozent Heilung** am Rastplatz, gemessen an den maximalen Lebenspunkten.
-- **Gegnerskalierung**: Lebenspunkte plus 5 je Stufe, zusätzliche Startquellen ab
-  Stufe 9. Die Simulation zeigt, dass Stufe 19 schwerer ist als Stufe 1 — mehr
-  nicht.
+  Test mit 5 Quellen zeigte keinen Unterschied (5.62 vs. 5.76). Unverändert
+  gelassen.
+- **6 Lebenspunkte** als Preis der Begegnung „Fremde Lehre". Nicht separat
+  simuliert, aber im Vergleich zum Shop-Preis (110 Gold für denselben Effekt)
+  und zur Rastplatz-Heilung (35 % von 40 LP ≈ 14 LP pro Rast) plausibel: unter
+  einer halben Rast-Heilung für einen Effekt, der sonst 110 Gold kostet. Als
+  günstige, seltene Alternative zum Shop-Kauf sinnvoll eingeordnet, kein
+  Anpassungsbedarf erkennbar.
+- **Gegnerskalierung**: Lebenspunkte plus 5 je Stufe, zusätzliche Startquellen
+  ab Stufe 9. Die ursprünglich harte Spitze lag konkret in den Basis-
+  Lebenspunkten der beiden frühesten Bosse (Aschefürst, Sturmherrin Nael), die
+  bereits gesenkt wurden. Die allgemeine Formel selbst zeigt in der Simulation
+  jetzt eine plausible, gestaffelte Schwierigkeitskurve über mehrere
+  Boss-Stufen (5, 10, 13+) statt einer einzelnen Wand. Kein weiterer
+  Anpassungsbedarf durch die aktuelle Datenlage belegt.
 
-Wer hier dreht, sollte danach `SimulationTest` laufen lassen; die Prüfungen auf
-Gewinnrate und Skalierung fangen grobe Ausreißer ab.
+Wer hier weiter dreht, sollte die volle Testsuite
+(`./gradlew :core:test --rerun-tasks`, 139 Tests) sowie idealerweise wieder
+eine vollständige Lauf-Simulation statt nur `SimulationTest` heranziehen —
+isolierte Gefechte gegen ein einzelnes Startdeck unterschätzen reale Probleme
+wie den Boss-Sprung deutlich.
 
 ## Nächste Schritte
 
