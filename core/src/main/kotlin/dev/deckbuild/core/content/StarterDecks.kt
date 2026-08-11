@@ -63,7 +63,7 @@ object StarterDecks {
             cards = listOf(
                 "flut_nebelkundschafter", "flut_nebelkundschafter", "flut_nebelkundschafter",
                 "flut_tiefenwaechter", "flut_tiefenwaechter",
-                "flut_gezeitenruf",
+                "flut_wellenreiter", "flut_wellenreiter",
                 "flut_erkenntnis", "flut_erkenntnis",
                 "flut_spiegelrochen", "flut_spiegelrochen",
                 "neutral_wachkonstrukt",
