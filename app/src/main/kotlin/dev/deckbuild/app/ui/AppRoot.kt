@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -19,7 +20,11 @@ import dev.deckbuild.core.session.Screen
 fun AppRoot(controller: GameController) {
     DeckbuildTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxSize().background(Palette.Background)) {
+            // MainActivity ruft enableEdgeToEdge() auf - ohne diesen Abstand
+            // zeichnet Compose bis unter Status- und Navigationsleiste, und
+            // Schaltflaechen am unteren Rand (z. B. "Zug beenden") landen im
+            // Gestenbereich des Systems und sind nicht mehr antippbar.
+            Box(Modifier.fillMaxSize().safeDrawingPadding().background(Palette.Background)) {
                 when (val screen = controller.screen) {
                     Screen.Home -> HomeScreen(controller)
                     Screen.PfadWahl -> PathScreen(controller)

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -94,6 +95,13 @@ fun BattleScreen(controller: GameController) {
 
 @Composable
 private fun PlayerBar(battle: Battle, side: Side, controller: GameController, title: String) {
+    // Erzwingt die Neuzeichnung dieser Komposition bei jeder Aktion - ohne
+    // diesen Lesezugriff kann Compose sie trotz geaenderter battle/controller-
+    // Referenzen ueberspringen (Smart Recomposition), da beide Objekte ueber
+    // mehrere Zuege hinweg dieselbe Identitaet behalten.
+    @Suppress("UNUSED_VARIABLE")
+    val version = controller.revision
+
     val state = battle.state
     val playerState = state.stateOf(side)
     val isTargetable = controller.isLegalTargetNow(TargetRef.PlayerTarget(side))
@@ -154,6 +162,13 @@ private fun PlayerBar(battle: Battle, side: Side, controller: GameController, ti
 
 @Composable
 private fun BoardRow(battle: Battle, controller: GameController, side: Side) {
+    // Erzwingt die Neuzeichnung dieser Komposition bei jeder Aktion - ohne
+    // diesen Lesezugriff kann Compose sie trotz geaenderter battle/controller-
+    // Referenzen ueberspringen (Smart Recomposition), da beide Objekte ueber
+    // mehrere Zuege hinweg dieselbe Identitaet behalten.
+    @Suppress("UNUSED_VARIABLE")
+    val version = controller.revision
+
     val state = battle.state
     val creatures = state.permanentsOf(side).filter { it.def.type != CardType.QUELLE && !it.isFaceDownSource }
     val sources = state.sources(side)
@@ -210,6 +225,13 @@ private fun BoardRow(battle: Battle, controller: GameController, side: Side) {
 
 @Composable
 private fun PermanentChip(battle: Battle, controller: GameController, permanent: Permanent) {
+    // Erzwingt die Neuzeichnung dieser Komposition bei jeder Aktion - ohne
+    // diesen Lesezugriff kann Compose sie trotz geaenderter battle/controller-
+    // Referenzen ueberspringen (Smart Recomposition), da beide Objekte ueber
+    // mehrere Zuege hinweg dieselbe Identitaet behalten.
+    @Suppress("UNUSED_VARIABLE")
+    val version = controller.revision
+
     val state = battle.state
     val colors = colorsFor(permanent.def.aspect)
     val power = state.power(permanent)
@@ -294,6 +316,13 @@ private fun PermanentChip(battle: Battle, controller: GameController, permanent:
 
 @Composable
 private fun MiddleStrip(battle: Battle, controller: GameController, modifier: Modifier) {
+    // Erzwingt die Neuzeichnung dieser Komposition bei jeder Aktion - ohne
+    // diesen Lesezugriff kann Compose sie trotz geaenderter battle/controller-
+    // Referenzen ueberspringen (Smart Recomposition), da beide Objekte ueber
+    // mehrere Zuege hinweg dieselbe Identitaet behalten.
+    @Suppress("UNUSED_VARIABLE")
+    val version = controller.revision
+
     val targeting = controller.targeting
 
     Column(modifier.fillMaxWidth()) {
@@ -463,12 +492,20 @@ private fun StepButton(label: String, onClick: () -> Unit) {
 
 @Composable
 private fun PouchRow(battle: Battle, controller: GameController) {
-    val pouch = battle.state.player.pouch
+    // Erzwingt die Neuzeichnung dieser Komposition bei jeder Aktion - ohne
+    // diesen Lesezugriff kann Compose sie trotz geaenderter battle/controller-
+    // Referenzen ueberspringen (Smart Recomposition), da beide Objekte ueber
+    // mehrere Zuege hinweg dieselbe Identitaet behalten.
+    @Suppress("UNUSED_VARIABLE")
+    val version = controller.revision
+
+    // Schnappschuss statt Live-Referenz - selber Grund wie bei HandRow: der
+    // Beutel ist eine im Spielkern mutierte MutableList, kein Compose-Snapshot.
+    val pouch = battle.state.player.pouch.toList()
     if (pouch.isEmpty()) return
 
     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        items(pouch.size) { index ->
-            val slot = pouch[index]
+        itemsIndexed(pouch, key = { _, slot -> slot.def.id }) { index, slot ->
             val colors = colorsFor(slot.def.aspect)
             Row(
                 Modifier
@@ -494,13 +531,25 @@ private fun PouchRow(battle: Battle, controller: GameController) {
 
 @Composable
 private fun HandRow(battle: Battle, controller: GameController) {
-    val hand = battle.state.player.hand
+    // Erzwingt die Neuzeichnung dieser Komposition bei jeder Aktion - ohne
+    // diesen Lesezugriff kann Compose sie trotz geaenderter battle/controller-
+    // Referenzen ueberspringen (Smart Recomposition), da beide Objekte ueber
+    // mehrere Zuege hinweg dieselbe Identitaet behalten.
+    @Suppress("UNUSED_VARIABLE")
+    val version = controller.revision
+
+    // Schnappschuss statt Live-Referenz: battle.state.player.hand ist eine im
+    // Spielkern mutierte MutableList (kein Compose-Snapshot). Ohne die Kopie
+    // kann eine Karte, die waehrend der verzoegerten Lazy-Komposition gespielt
+    // wird, die Liste unter den Fuessen der LazyRow verkuerzen und zu einem
+    // IndexOutOfBoundsException fuehren.
+    val hand = battle.state.player.hand.toList()
 
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier.heightIn(min = 128.dp),
     ) {
-        items(hand) { card ->
+        items(hand, key = { it.instanceId }) { card ->
             val playable = controller.faceDownMode ||
                 battle.canCast(Side.SPIELER, card)
             CardFace(
@@ -517,6 +566,13 @@ private fun HandRow(battle: Battle, controller: GameController) {
 
 @Composable
 private fun ActionBar(battle: Battle, controller: GameController) {
+    // Erzwingt die Neuzeichnung dieser Komposition bei jeder Aktion - ohne
+    // diesen Lesezugriff kann Compose sie trotz geaenderter battle/controller-
+    // Referenzen ueberspringen (Smart Recomposition), da beide Objekte ueber
+    // mehrere Zuege hinweg dieselbe Identitaet behalten.
+    @Suppress("UNUSED_VARIABLE")
+    val version = controller.revision
+
     val state = battle.state
 
     Row(
