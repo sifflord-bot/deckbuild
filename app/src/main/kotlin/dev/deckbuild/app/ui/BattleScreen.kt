@@ -1,5 +1,15 @@
 package dev.deckbuild.app.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,8 +34,11 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -33,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -46,6 +60,8 @@ import dev.deckbuild.core.model.CardType
 import dev.deckbuild.core.model.Side
 import dev.deckbuild.core.session.CastStage
 import dev.deckbuild.core.session.TargetingState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun BattleScreen(controller: GameController) {
@@ -132,11 +148,16 @@ private fun PlayerBar(battle: Battle, side: Side, controller: GameController, ti
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                "♥ ${playerState.life}",
-                style = MaterialTheme.typography.titleSmall,
-                color = Palette.Health,
-            )
+            Box {
+                Text(
+                    "♥ ${playerState.life}",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Palette.Health,
+                )
+                // Fliegende Schadens-/Heilzahl statt stillem Zahlenwechsel -
+                // steigt kurz auf, verblasst, und verschwindet wieder.
+                FloatingDelta(value = playerState.life, modifier = Modifier.align(Alignment.TopCenter))
+            }
             Spacer(Modifier.width(10.dp))
             Text(
                 "◈ ${state.availableEssence(side)}",
@@ -155,6 +176,49 @@ private fun PlayerBar(battle: Battle, side: Side, controller: GameController, ti
             fraction = playerState.life.toFloat() / playerState.maxLife.coerceAtLeast(1),
             color = if (side == Side.SPIELER) Palette.Health else Palette.Danger,
         )
+    }
+}
+
+/**
+ * Fliegende +/- Zahl bei Lebenspunkt-Aenderung. Reine Anzeige-Reaktion auf
+ * einen Wertwechsel, ohne den Spielzustand zu beruehren - erkennt die
+ * Aenderung selbst ueber den letzten gesehenen Wert.
+ */
+@Composable
+private fun FloatingDelta(value: Int, modifier: Modifier = Modifier) {
+    var previous by remember { mutableIntStateOf(value) }
+    var pendingDelta by remember { mutableStateOf<Int?>(null) }
+    var deltaKey by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(value) {
+        if (value != previous) {
+            pendingDelta = value - previous
+            deltaKey++
+            previous = value
+        }
+    }
+
+    val currentDelta = pendingDelta
+    if (currentDelta != null && currentDelta != 0) {
+        key(deltaKey) {
+            val alpha = remember { Animatable(1f) }
+            val offsetY = remember { Animatable(0f) }
+            LaunchedEffect(deltaKey) {
+                launch { alpha.animateTo(0f, tween(850)) }
+                launch { offsetY.animateTo(-26f, tween(850, easing = FastOutSlowInEasing)) }
+                delay(850)
+                pendingDelta = null
+            }
+            Text(
+                text = if (currentDelta > 0) "+$currentDelta" else "$currentDelta",
+                color = if (currentDelta > 0) Palette.Health else Palette.Danger,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = modifier.graphicsLayer {
+                    translationY = offsetY.value
+                    this.alpha = alpha.value
+                },
+            )
+        }
     }
 }
 
@@ -215,8 +279,11 @@ private fun BoardRow(battle: Battle, controller: GameController, side: Side) {
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.height(88.dp),
             ) {
-                items(creatures) { permanent ->
-                    PermanentChip(battle, controller, permanent)
+                items(creatures, key = { it.instanceId }) { permanent ->
+                    // animateItem() laesst eine sterbende Kreatur aus der
+                    // Reihe gleiten statt schlagartig zu verschwinden, und
+                    // ruecken die uebrigen sanft nach.
+                    PermanentChip(battle, controller, permanent, Modifier.animateItem())
                 }
             }
         }
@@ -224,7 +291,12 @@ private fun BoardRow(battle: Battle, controller: GameController, side: Side) {
 }
 
 @Composable
-private fun PermanentChip(battle: Battle, controller: GameController, permanent: Permanent) {
+private fun PermanentChip(
+    battle: Battle,
+    controller: GameController,
+    permanent: Permanent,
+    modifier: Modifier = Modifier,
+) {
     // Erzwingt die Neuzeichnung dieser Komposition bei jeder Aktion - ohne
     // diesen Lesezugriff kann Compose sie trotz geaenderter battle/controller-
     // Referenzen ueberspringen (Smart Recomposition), da beide Objekte ueber
@@ -251,8 +323,17 @@ private fun PermanentChip(battle: Battle, controller: GameController, permanent:
         else -> colors.glow.copy(alpha = 0.5f)
     }
 
+    // Sanftes Antippen statt starrem Sprung: Angreifer/Blocker heben sich
+    // leicht an, damit eine Auswahl auch ohne Farbwechsel sofort auffaellt.
+    val liftScale by animateFloatAsState(
+        targetValue = if (isSelectedAttacker || isSelectedBlocker || permanent.attacking) 1.06f else 1f,
+        animationSpec = tween(180, easing = FastOutSlowInEasing),
+        label = "permanentLift",
+    )
+
     Column(
-        Modifier
+        modifier
+            .graphicsLayer { scaleX = liftScale; scaleY = liftScale }
             .width(76.dp)
             .height(88.dp)
             .clip(RoundedCornerShape(8.dp))
@@ -326,9 +407,19 @@ private fun MiddleStrip(battle: Battle, controller: GameController, modifier: Mo
     val targeting = controller.targeting
 
     Column(modifier.fillMaxWidth()) {
-        if (targeting != null) {
-            CastPrompt(targeting, controller)
-            Spacer(Modifier.height(4.dp))
+        // Sanftes Ein-/Ausblenden statt hartem Sprung: Die Zielaufforderung
+        // taucht mitten im Bildschirm auf und soll nicht wie ein Fehler wirken.
+        AnimatedVisibility(
+            visible = targeting != null,
+            enter = fadeIn(tween(180)) + expandVertically(tween(180)),
+            exit = fadeOut(tween(140)) + shrinkVertically(tween(140)),
+        ) {
+            if (targeting != null) {
+                Column {
+                    CastPrompt(targeting, controller)
+                    Spacer(Modifier.height(4.dp))
+                }
+            }
         }
 
         Row(
@@ -365,9 +456,15 @@ private fun MiddleStrip(battle: Battle, controller: GameController, modifier: Mo
                 .background(Palette.Surface.copy(alpha = 0.6f))
                 .padding(horizontal = 8.dp, vertical = 4.dp),
         ) {
-            val entries = battle.log.takeLast(40).reversed()
+            // Stabiler Schluessel = Position im Gesamtprotokoll (nur
+            // anhaengend, nie umsortiert) statt Position in der begrenzten,
+            // umgedrehten Ansicht - sonst waeren gleichlautende Zeilen nicht
+            // unterscheidbar und animateItem() koennte Zeilen verwechseln.
+            val fullLog = battle.log
+            val entries = fullLog.takeLast(40).reversed()
+                .mapIndexed { i, entry -> (fullLog.size - 1 - i) to entry }
             LazyColumn(reverseLayout = false) {
-                items(entries) { entry ->
+                items(entries, key = { it.first }) { (_, entry) ->
                     Text(
                         entry.text,
                         style = MaterialTheme.typography.labelSmall,
@@ -376,6 +473,10 @@ private fun MiddleStrip(battle: Battle, controller: GameController, modifier: Mo
                             entry.side == Side.SPIELER -> Palette.TextPrimary
                             else -> Palette.TextMuted
                         },
+                        // Neue Zeilen ruecken sanft in Position statt zu
+                        // springen - besonders spuerbar, wenn der Gegnerzug
+                        // mehrere Eintraege auf einmal nachliefert.
+                        modifier = Modifier.animateItem(),
                     )
                 }
             }
@@ -554,6 +655,9 @@ private fun HandRow(battle: Battle, controller: GameController) {
                 battle.canCast(Side.SPIELER, card)
             CardFace(
                 def = card.def,
+                // animateItem() laesst eine gespielte Karte aus der Hand
+                // gleiten statt schlagartig zu verschwinden.
+                modifier = Modifier.animateItem(),
                 width = 90.dp,
                 playable = playable,
                 selected = controller.faceDownMode,

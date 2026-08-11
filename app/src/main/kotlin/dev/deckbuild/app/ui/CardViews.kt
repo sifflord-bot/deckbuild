@@ -1,8 +1,13 @@
 package dev.deckbuild.app.ui
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,10 +24,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
@@ -56,8 +64,19 @@ fun CardFace(
         else -> Palette.Outline
     }
 
+    // Tap-Feedback: die Karte weicht kurz zurueck, sobald der Finger sie
+    // beruehrt - fuehlt sich wie Papier an, nicht wie eine tote Flaeche.
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.94f else 1f,
+        animationSpec = tween(120, easing = FastOutSlowInEasing),
+        label = "cardPress",
+    )
+
     Column(
         modifier = modifier
+            .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
             .width(width)
             .height(height)
             .clip(RoundedCornerShape(10.dp))
@@ -72,7 +91,17 @@ fun CardFace(
             )
             .border(if (selected) 2.5.dp else 1.5.dp, borderColor, RoundedCornerShape(10.dp))
             .alpha(if (playable) 1f else 0.55f)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = onClick,
+                    )
+                } else {
+                    Modifier
+                },
+            )
             .padding(6.dp),
     ) {
         Row(
@@ -95,23 +124,22 @@ fun CardFace(
 
         Spacer(Modifier.height(3.dp))
 
-        // Prozedurale "Illustration": ein Farbband, das den Aspekt traegt.
+        // Prozedurale "Illustration": ein deterministisches Muster je Karte,
+        // siehe CardArt.kt - keine Bilddatei, keine Lizenzfrage.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(width * 0.38f)
                 .clip(RoundedCornerShape(6.dp))
-                .background(
-                    Brush.linearGradient(
-                        listOf(colors.glow.copy(alpha = 0.65f), colors.primary.copy(alpha = 0.25f)),
-                    ),
-                ),
+                .background(colors.ink),
             contentAlignment = Alignment.Center,
         ) {
+            CardArt(def = def, colors = colors, modifier = Modifier.fillMaxWidth().height(width * 0.38f))
             Text(
                 text = typeGlyph(def.type),
-                color = Color.Black.copy(alpha = 0.55f),
-                style = MaterialTheme.typography.titleMedium,
+                color = Color.Black.copy(alpha = 0.35f),
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp),
             )
         }
 
@@ -216,6 +244,13 @@ fun Meter(
     modifier: Modifier = Modifier,
     height: androidx.compose.ui.unit.Dp = 6.dp,
 ) {
+    // Tweent zum neuen Wert statt zu springen - Schaden und Heilung wirken
+    // dadurch wie ein Ereignis, nicht wie ein stiller Zahlenwechsel.
+    val animatedFraction by animateFloatAsState(
+        targetValue = fraction.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
+        label = "meterFraction",
+    )
     Box(
         modifier = modifier
             .height(height)
@@ -224,7 +259,7 @@ fun Meter(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                .fillMaxWidth(animatedFraction)
                 .height(height)
                 .clip(RoundedCornerShape(3.dp))
                 .background(color),
